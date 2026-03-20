@@ -1,0 +1,9 @@
+# ninja log v5
+2	3195	1773928063419385103	CMakeFiles/XPlaneMovingMap.dir/src/plugin.cpp.obj	d23bc979fe42212c
+3	27443	1773928087664989059	CMakeFiles/XPlaneMovingMap.dir/src/server.cpp.obj	a37e9ab59061afc
+1	3021	1773931522967796164	CMakeFiles/DogeTracker.dir/src/plugin.cpp.obj	879373744dddbe5
+4	374	1773940036722701531	libwin.dll.a	72ca5c43a280d2b1
+2	23746	1773931543683183014	CMakeFiles/DogeTracker.dir/src/server.cpp.obj	dccc386884d543f6
+4	374	1773940036722701531	package/DogeTracker/64/win.xpl	72ca5c43a280d2b1
+5	392	1773974471174351207	package/DogeTracker/64/win.xpl	72ca5c43a280d2b1
+5	392	1773974471174351207	libwin.dll.a	72ca5c43a280d2b1
