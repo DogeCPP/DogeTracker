@@ -4,7 +4,7 @@ A live moving map for X-Plane 12. Open your browser, point it at `http://127.0.0
 
 Built with a C++ X-Plane plugin that reads your simulator's flight data and serves it over a tiny local HTTP server. The frontend is just HTML, CSS, and JavaScript - no app to install, nothing to configure beyond dropping a folder into your plugins directory.
 
-![DogeTracker screenshot](web/dogepilot.png)
+![DogeTracker screenshot](dogepilot.png)
 
 ---
 
