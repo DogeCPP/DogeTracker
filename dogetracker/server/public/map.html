@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DogeTracker — Live Map</title>
+
+<!-- Leaflet -->
+<link  rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --border:    #30363d;
+    --accent:    #f7c948;
+    --accent2:   #58a6ff;
+    --text:      #e6edf3;
+    --muted:     #8b949e;
+    --green:     #3fb950;
+    --red:       #f85149;
+    --radius:    8px;
+    --font:      'Segoe UI', system-ui, sans-serif;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); overflow: hidden; }
+
+  /* ── Layout ─────────────────────────────────────────────────────────── */
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ── Header ─────────────────────────────────────────────────────────── */
+  #header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px; background: var(--surface);
+    border-bottom: 1px solid var(--border); flex-shrink: 0; gap: 10px;
+  }
+  #header-left { display: flex; align-items: center; gap: 10px; }
+  #logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; color: var(--accent); }
+  #logo span { color: var(--text); font-weight: 400; }
+  #pill {
+    background: var(--green); color: #000; font-size: 10px; font-weight: 700;
+    padding: 2px 8px; border-radius: 99px; letter-spacing: 0.5px;
+  }
+  #pill.empty { background: var(--muted); }
+
+  /* ── Search / filter ─────────────────────────────────────────────────── */
+  #search {
+    flex: 1; max-width: 220px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text); font-size: 12px; padding: 5px 10px; outline: none;
+  }
+  #search:focus { border-color: var(--accent2); }
+
+  /* ── Refresh indicator ───────────────────────────────────────────────── */
+  #refresh-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green); flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  #refresh-dot.stale { background: var(--red); }
+
+  /* ── Body: map + sidebar ─────────────────────────────────────────────── */
+  #body { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── Map ─────────────────────────────────────────────────────────────── */
+  #map { flex: 1; }
+
+  /* ── Sidebar ─────────────────────────────────────────────────────────── */
+  #sidebar {
+    width: 200px; background: var(--surface); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
+  }
+  #sidebar-title {
+    font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: 1px;
+    padding: 8px 12px 6px; border-bottom: 1px solid var(--border); text-transform: uppercase;
+  }
+  #pilot-list { overflow-y: auto; flex: 1; }
+  #pilot-list::-webkit-scrollbar { width: 4px; }
+  #pilot-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .pilot-card {
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background 0.15s;
+  }
+  .pilot-card:hover { background: rgba(255,255,255,0.04); }
+  .pilot-card.active { background: rgba(247,201,72,0.08); border-left: 3px solid var(--accent); }
+
+  .pilot-callsign {
+    font-size: 13px; font-weight: 700; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pilot-aircraft { font-size: 10px; color: var(--accent); margin-top: 1px; }
+  .pilot-stats {
+    display: flex; gap: 8px; margin-top: 4px;
+    font-size: 10px; color: var(--muted); flex-wrap: wrap;
+  }
+  .pilot-stat span { color: var(--text); }
+  .pilot-stale .pilot-callsign { color: var(--muted); }
+  .pilot-stale .pilot-aircraft { color: var(--red); }
+
+  #empty-state {
+    padding: 24px 12px; text-align: center;
+    font-size: 12px; color: var(--muted); display: none;
+  }
+  #empty-state .icon { font-size: 28px; margin-bottom: 8px; }
+
+  /* ── Footer ──────────────────────────────────────────────────────────── */
+  #footer {
+    font-size: 10px; color: var(--muted); padding: 5px 14px;
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; gap: 12px; flex-shrink: 0;
+  }
+  #footer b { color: var(--text); }
+
+  /* ── Leaflet overrides ───────────────────────────────────────────────── */
+  .leaflet-container { background: #1a2030; }
+  .leaflet-control-zoom a {
+    background: var(--surface) !important; color: var(--text) !important;
+    border-color: var(--border) !important;
+  }
+  .leaflet-control-attribution { background: rgba(13,17,23,0.8) !important; color: var(--muted) !important; }
+  .leaflet-control-attribution a { color: var(--accent2) !important; }
+
+  /* ── Plane popup ─────────────────────────────────────────────────────── */
+  .leaflet-popup-content-wrapper {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text); box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  .leaflet-popup-tip { background: var(--surface); }
+  .leaflet-popup-content { margin: 12px 14px; font-family: var(--font); }
+  .popup-callsign { font-size: 16px; font-weight: 700; color: var(--accent); }
+  .popup-aircraft { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .popup-row { display: flex; justify-content: space-between; font-size: 12px; margin: 3px 0; }
+  .popup-label { color: var(--muted); }
+  .popup-value { color: var(--text); font-weight: 600; }
+  .popup-id { font-size: 9px; color: var(--border); margin-top: 8px; word-break: break-all; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <div id="header">
+    <div id="header-left">
+      <div id="logo">Doge<span>Tracker</span></div>
+      <div id="pill" class="empty">0 online</div>
+    </div>
+    <input id="search" type="text" placeholder="Filter callsign…" autocomplete="off">
+    <div id="refresh-dot" title="Live feed"></div>
+  </div>
+
+  <!-- Body -->
+  <div id="body">
+    <div id="map"></div>
+    <div id="sidebar">
+      <div id="sidebar-title">Pilots online</div>
+      <div id="pilot-list">
+        <div id="empty-state">
+          <div class="icon">✈️</div>
+          No pilots online.<br>Load a flight to appear!
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div id="footer">
+    <div>Pilots: <b id="f-count">0</b></div>
+    <div>Last update: <b id="f-time">—</b></div>
+    <div style="margin-left:auto">DogeTracker v1.0</div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+//  Map setup
+// ─────────────────────────────────────────────────────────────────────────────
+const map = L.map("map", { zoomControl: true, attributionControl: true }).setView([20, 0], 3);
+
+// Dark tile layer (CartoDB Dark Matter)
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+  attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains: "abcd",
+  maxZoom: 18,
+}).addTo(map);
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  State
+// ─────────────────────────────────────────────────────────────────────────────
+let markers    = {};   // pilot_id → L.marker
+let activePilot = null;
+let filterText  = "";
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Plane SVG icon – rotated to heading
+// ─────────────────────────────────────────────────────────────────────────────
+function planeIcon(heading, isActive) {
+  const size   = isActive ? 32 : 26;
+  const colour = isActive ? "#f7c948" : "#58a6ff";
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${size}" height="${size}"
+         style="transform:rotate(${heading}deg);filter:drop-shadow(0 1px 4px rgba(0,0,0,.6))">
+      <path fill="${colour}"
+        d="M50 5 L62 40 L95 50 L62 60 L65 90 L50 80 L35 90 L38 60 L5 50 L38 40 Z"/>
+    </svg>`;
+  return L.divIcon({
+    html:        svg,
+    className:   "",
+    iconSize:    [size, size],
+    iconAnchor:  [size / 2, size / 2],
+    popupAnchor: [0, -(size / 2 + 4)],
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Popup HTML
+// ─────────────────────────────────────────────────────────────────────────────
+function popupHtml(p) {
+  return `
+    <div class="popup-callsign">${esc(p.callsign)}</div>
+    <div class="popup-aircraft">${esc(p.aircraft)}</div>
+    <div class="popup-row"><span class="popup-label">Altitude</span><span class="popup-value">${p.alt_ft.toLocaleString()} ft</span></div>
+    <div class="popup-row"><span class="popup-label">Speed</span><span class="popup-value">${p.speed_kts} kts</span></div>
+    <div class="popup-row"><span class="popup-label">Heading</span><span class="popup-value">${p.heading}°</span></div>
+    <div class="popup-row"><span class="popup-label">Position</span><span class="popup-value">${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}</span></div>
+    <div class="popup-row"><span class="popup-label">Last seen</span><span class="popup-value">${p.last_seen}s ago</span></div>
+    <div class="popup-id">ID: ${esc(p.pilot_id)}</div>`;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Sidebar card HTML
+// ─────────────────────────────────────────────────────────────────────────────
+function cardHtml(p) {
+  const stale = p.last_seen > 20;
+  return `
+    <div class="pilot-card${activePilot === p.pilot_id ? " active" : ""}${stale ? " pilot-stale" : ""}"
+         data-id="${esc(p.pilot_id)}" onclick="focusPilot('${esc(p.pilot_id)}')">
+      <div class="pilot-callsign">${esc(p.callsign)}</div>
+      <div class="pilot-aircraft">${esc(p.aircraft)}</div>
+      <div class="pilot-stats">
+        <div>ALT <span>${p.alt_ft.toLocaleString()}ft</span></div>
+        <div>SPD <span>${p.speed_kts}kt</span></div>
+        <div>HDG <span>${p.heading}°</span></div>
+      </div>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Focus on a pilot
+// ─────────────────────────────────────────────────────────────────────────────
+window.focusPilot = function(id) {
+  activePilot = activePilot === id ? null : id;
+  renderSidebar(lastPilots);
+
+  if (activePilot && markers[id]) {
+    map.setView(markers[id].getLatLng(), Math.max(map.getZoom(), 7), { animate: true });
+    markers[id].openPopup();
+  }
+  // Refresh icon states
+  for (const [pid, marker] of Object.entries(markers)) {
+    const p = lastPilots.find(x => x.pilot_id === pid);
+    if (p) marker.setIcon(planeIcon(p.heading, pid === activePilot));
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Render sidebar
+// ─────────────────────────────────────────────────────────────────────────────
+let lastPilots = [];
+
+function renderSidebar(pilots) {
+  lastPilots = pilots;
+  const list  = document.getElementById("pilot-list");
+  const empty = document.getElementById("empty-state");
+  const filter = filterText.toLowerCase();
+
+  const filtered = pilots.filter(p =>
+    !filter ||
+    p.callsign.toLowerCase().includes(filter) ||
+    p.aircraft.toLowerCase().includes(filter)
+  );
+
+  if (filtered.length === 0) {
+    list.innerHTML = "";
+    list.appendChild(empty);
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  list.innerHTML = filtered.map(cardHtml).join("");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Main fetch + update
+// ─────────────────────────────────────────────────────────────────────────────
+async function fetchPilots() {
+  const dot = document.getElementById("refresh-dot");
+  try {
+    const res  = await fetch("/api/users");
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    const pilots = data.pilots || [];
+
+    // Update pill
+    const pill = document.getElementById("pill");
+    pill.textContent = `${pilots.length} online`;
+    pill.className   = pilots.length > 0 ? "" : "empty";
+
+    // Footer
+    document.getElementById("f-count").textContent = pilots.length;
+    document.getElementById("f-time").textContent  = new Date().toLocaleTimeString();
+
+    // Remove markers for pilots no longer present
+    const currentIds = new Set(pilots.map(p => p.pilot_id));
+    for (const id of Object.keys(markers)) {
+      if (!currentIds.has(id)) {
+        map.removeLayer(markers[id]);
+        delete markers[id];
+      }
+    }
+
+    // Add / update markers
+    for (const p of pilots) {
+      const isActive = p.pilot_id === activePilot;
+      const icon     = planeIcon(p.heading, isActive);
+      const latlng   = [p.lat, p.lon];
+
+      if (markers[p.pilot_id]) {
+        markers[p.pilot_id].setLatLng(latlng).setIcon(icon);
+        if (markers[p.pilot_id].isPopupOpen()) {
+          markers[p.pilot_id].setPopupContent(popupHtml(p));
+        }
+      } else {
+        const marker = L.marker(latlng, { icon })
+          .bindPopup(popupHtml(p), { maxWidth: 240 })
+          .addTo(map);
+        marker.on("click", () => {
+          activePilot = p.pilot_id;
+          renderSidebar(lastPilots);
+          for (const [pid, m] of Object.entries(markers)) {
+            const pp = lastPilots.find(x => x.pilot_id === pid);
+            if (pp) m.setIcon(planeIcon(pp.heading, pid === activePilot));
+          }
+        });
+        markers[p.pilot_id] = marker;
+      }
+    }
+
+    renderSidebar(pilots);
+
+    dot.className = "";
+  } catch (err) {
+    console.warn("[DogeTracker] Fetch error:", err);
+    dot.className = "stale";
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Filter input
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById("search").addEventListener("input", function() {
+  filterText = this.value;
+  renderSidebar(lastPilots);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Bootstrap
+// ─────────────────────────────────────────────────────────────────────────────
+fetchPilots();
+setInterval(fetchPilots, 5000);
+</script>
+</body>
+</html>
