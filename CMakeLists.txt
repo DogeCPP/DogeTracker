@@ -1,198 +1,160 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.25.1)
-SET(CMAKE_CXX_STANDARD 23)
-SET(CMAKE_CXX_STANDARD_REQUIRED ON)
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -DNDEBUG")
-SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -DNDEBUG")
-PROJECT(dogetracker C CXX)
+cmake_minimum_required(VERSION 3.20)
+project(DogeTracker VERSION 1.0.2 LANGUAGES CXX)
 
-IF(APPLE)
-    # Detect whether we're building for Apple Silicon (arm64) or Intel (x86_64)
-    IF(CMAKE_OSX_ARCHITECTURES MATCHES "arm64" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
-        SET(DIRECTORY_PREFIX "mac_arm64")
-    ELSE()
-        SET(DIRECTORY_PREFIX "mac_x64")
-    ENDIF()
-    SET(XPLANE_LIBRARY_PATH "${CMAKE_CURRENT_SOURCE_DIR}/SDK/Libraries/Mac/")
-ELSEIF(UNIX)
-    SET(DIRECTORY_PREFIX "lin_x64")
-    SET(XPLANE_LIBRARY_PATH "${CMAKE_CURRENT_SOURCE_DIR}/SDK/Libraries/Lin/")
-ELSEIF(WIN32)
-    SET(DIRECTORY_PREFIX "win_x64")
-    SET(XPLANE_LIBRARY_PATH "${CMAKE_CURRENT_SOURCE_DIR}/SDK/Libraries/Win/")
-ENDIF()
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-SET(XPLANE_INCLUDES_PATH "${CMAKE_CURRENT_SOURCE_DIR}/SDK/CHeaders/" CACHE STRING PATH)
+# ── Detect platform ──────────────────────────────────────────────────
+if(APPLE)
+    set(PLATFORM_MAC TRUE)
+    set(PLATFORM_NAME "mac")
+elseif(UNIX)
+    set(PLATFORM_LIN TRUE)
+    set(PLATFORM_NAME "lin")
+elseif(WIN32 OR CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Windows" OR MINGW)
+    set(PLATFORM_WIN TRUE)
+    set(PLATFORM_NAME "win")
+else()
+    message(FATAL_ERROR "Unsupported platform.")
+endif()
 
-IF(APPLE)
-    FIND_PACKAGE(CURL REQUIRED)
-    SET(CURL_LIBRARY CURL::libcurl)
-    # For macOS ARM64 we look in mac_arm64/cef first, then fall back to mac_x64/cef
-    IF (XPLANE_VERSION GREATER_EQUAL 12)
-        FIND_LIBRARY(CEF_LIBRARY "Chromium Embedded Framework" PATHS
-            "${CMAKE_CURRENT_SOURCE_DIR}/lib/${DIRECTORY_PREFIX}/cef"
-            "${CMAKE_CURRENT_SOURCE_DIR}/lib/mac_x64/cef")
-    ENDIF()
-    # Try arch-specific wrapper first
-    IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/${DIRECTORY_PREFIX}/cef/libcef_dll_wrapper.a")
-        SET(CEF_WRAPPER "${CMAKE_CURRENT_SOURCE_DIR}/lib/${DIRECTORY_PREFIX}/cef/libcef_dll_wrapper.a")
-    ELSE()
-        SET(CEF_WRAPPER "${CMAKE_CURRENT_SOURCE_DIR}/lib/mac_x64/cef/libcef_dll_wrapper.a")
-    ENDIF()
-    FIND_LIBRARY(COCOA_LIBRARY Cocoa)
-    FIND_LIBRARY(OPENGL_LIBRARY OpenGL)
-	FIND_LIBRARY(XPLM_LIBRARY XPLM "${XPLANE_LIBRARY_PATH}")
-	FIND_LIBRARY(XPWIDGETS_LIBRARY XPWidgets "${XPLANE_LIBRARY_PATH}")
-	ADD_LIBRARY(xplm STATIC IMPORTED GLOBAL)
-	ADD_LIBRARY(xpwidgets STATIC IMPORTED GLOBAL)
-	SET_PROPERTY(TARGET xplm PROPERTY IMPORTED_LOCATION "${XPLM_LIBRARY}")
-	SET_PROPERTY(TARGET xpwidgets PROPERTY IMPORTED_LOCATION "${XPWIDGETS_LIBRARY}")
-ELSEIF(WIN32)
-    FIND_LIBRARY(CEF_LIBRARY NAMES libcef PATHS "${CMAKE_CURRENT_SOURCE_DIR}/lib/${DIRECTORY_PREFIX}/cef/Release")
-    SET(CEF_WRAPPER "${CMAKE_CURRENT_SOURCE_DIR}/lib/${DIRECTORY_PREFIX}/cef/libcef_dll_wrapper/libcef_dll_wrapper.a")
-    FIND_LIBRARY(OPENGL_LIBRARY NAMES opengl32 PATHS "/opt/homebrew/Cellar/mingw-w64/*/toolchain-x86_64/x86_64-w64-mingw32/lib")
-    FIND_LIBRARY(CURL_LIBRARY NAMES libcurl PATHS "${CMAKE_CURRENT_SOURCE_DIR}/lib/${DIRECTORY_PREFIX}/curl/lib")
-	FIND_LIBRARY(XPLM_LIBRARY XPLM_64 "${XPLANE_LIBRARY_PATH}")
-	FIND_LIBRARY(XPWIDGETS_LIBRARY XPWidgets_64 "${XPLANE_LIBRARY_PATH}")
-	ADD_LIBRARY(xplm SHARED IMPORTED GLOBAL)
-	ADD_LIBRARY(xpwidgets SHARED IMPORTED GLOBAL)
-	SET_PROPERTY(TARGET xplm PROPERTY IMPORTED_IMPLIB "${XPLM_LIBRARY}")
-	SET_PROPERTY(TARGET xpwidgets PROPERTY IMPORTED_IMPLIB "${XPWIDGETS_LIBRARY}")
-ELSEIF(UNIX)
-    FIND_PACKAGE(CURL REQUIRED)
-    FIND_LIBRARY(OPENSSL_LIBRARY NAMES libssl.so PATHS "/usr/lib/x86_64-linux-gnu")
-    FIND_LIBRARY(OPENSSL_CRYPTO_LIBRARY NAMES libcrypto.so PATHS "/usr/lib/x86_64-linux-gnu")
-    FIND_LIBRARY(CURL_LIBRARY NAMES libcurl.so PATHS "/usr/lib/x86_64-linux-gnu")
-    FIND_LIBRARY(CEF_LIBRARY libcef.so PATHS "${CMAKE_CURRENT_SOURCE_DIR}/lib/${DIRECTORY_PREFIX}/cef/Release" NO_DEFAULT_PATH)
-    SET(CEF_WRAPPER "${CMAKE_CURRENT_SOURCE_DIR}/lib/${DIRECTORY_PREFIX}/cef/libcef_dll_wrapper/libcef_dll_wrapper.a")
-    FIND_PACKAGE(OpenGL REQUIRED)
-    FIND_LIBRARY(XPLM_LIBRARY XPLM_64.so PATHS "${XPLANE_LIBRARY_PATH}" REQUIRED)
-    FIND_LIBRARY(XPWIDGETS_LIBRARY XPWidgets_64.so PATHS "${XPLANE_LIBRARY_PATH}" REQUIRED)
-    ADD_LIBRARY(xplm SHARED IMPORTED GLOBAL)
-    ADD_LIBRARY(xpwidgets SHARED IMPORTED GLOBAL)
-    SET_PROPERTY(TARGET xplm PROPERTY IMPORTED_LOCATION "${XPLM_LIBRARY}")
-    SET_PROPERTY(TARGET xpwidgets PROPERTY IMPORTED_LOCATION "${XPWIDGETS_LIBRARY}")
+message(STATUS "Building DogeTracker for: ${PLATFORM_NAME}")
 
-ENDIF()
+# ── X-Plane SDK ───────────────────────────────────────────────────────
+set(XPLANE_SDK_PATH "" CACHE PATH "X-Plane SDK root (must contain CHeaders/ and Libraries/)")
+if(NOT XPLANE_SDK_PATH)
+    message(FATAL_ERROR "XPLANE_SDK_PATH is not set. Download from https://developer.x-plane.com/sdk/")
+endif()
+if(NOT EXISTS "${XPLANE_SDK_PATH}/CHeaders/XPLM/XPLMPlugin.h")
+    message(FATAL_ERROR "XPLMPlugin.h not found in: ${XPLANE_SDK_PATH}/CHeaders/XPLM/")
+endif()
 
-SET_PROPERTY(TARGET xplm APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/SDK/CHeaders/XPLM" "${CMAKE_CURRENT_SOURCE_DIR}/SDK/CHeaders/Wrappers")
-SET_PROPERTY(TARGET xpwidgets APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/SDK/CHeaders/XPLM" "${CMAKE_CURRENT_SOURCE_DIR}/SDK/CHeaders/Widgets" "${CMAKE_CURRENT_SOURCE_DIR}/SDK/CHeaders/Wrappers")
+# ── cpp-httplib (header-only, cross-platform HTTP server) ────────────
+include(FetchContent)
+FetchContent_Declare(
+    httplib
+    GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+    GIT_TAG        v0.15.3
+    GIT_SHALLOW    TRUE
+)
+set(HTTPLIB_COMPILE OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(httplib)
 
-FUNCTION(HEADER_DIRECTORIES return_list base_dir)
-    FILE(GLOB_RECURSE new_list "${base_dir}/*.h" "${base_dir}/*.hpp")
-    SET(dir_list "")
-    FOREACH(file_path ${new_list})
-        GET_FILENAME_COMPONENT(dir_path ${file_path} PATH)
-        LIST(APPEND dir_list ${dir_path})
-    ENDFOREACH()
-    LIST(REMOVE_DUPLICATES dir_list)
-    SET(${return_list} ${dir_list} PARENT_SCOPE)
-ENDFUNCTION()
+# ── Plugin target ────────────────────────────────────────────────────
+add_library(DogeTracker SHARED
+    src/plugin.cpp
+    src/server.cpp
+)
 
-FUNCTION(FIND_SOURCE_FILES return_list base_dir)
-    SET(file_patterns "${base_dir}/*.c" "${base_dir}/*.cpp" "${base_dir}/*.hpp")
+target_include_directories(DogeTracker PRIVATE
+    src
+    "${httplib_SOURCE_DIR}"
+    "${XPLANE_SDK_PATH}/CHeaders/XPLM"
+    "${XPLANE_SDK_PATH}/CHeaders/Widgets"
+)
 
-    IF(APPLE)
-        LIST(APPEND file_patterns "${base_dir}/*.mm")
-    ENDIF()
-    FILE(GLOB_RECURSE new_list ${file_patterns})
+# ── Platform compile definitions ─────────────────────────────────────
+if(PLATFORM_MAC)
+    target_compile_definitions(DogeTracker PRIVATE
+        APL=1 IBM=0 LIN=0
+        XPLM200=1 XPLM210=1 XPLM300=1 XPLM301=1 XPLM400=1
+        GL_SILENCE_DEPRECATION=1
+    )
+elseif(PLATFORM_LIN)
+    target_compile_definitions(DogeTracker PRIVATE
+        APL=0 IBM=0 LIN=1
+        XPLM200=1 XPLM210=1 XPLM300=1 XPLM301=1 XPLM400=1
+    )
+elseif(PLATFORM_WIN)
+    target_compile_definitions(DogeTracker PRIVATE
+        APL=0 IBM=1 LIN=0
+        XPLM200=1 XPLM210=1 XPLM300=1 XPLM301=1 XPLM400=1
+        WIN32_LEAN_AND_MEAN NOMINMAX _USE_MATH_DEFINES
+    )
+endif()
 
-    LIST(FIND new_list "${base_dir}/main.cpp" main_index)
-    IF(main_index GREATER_EQUAL 0)
-        LIST(REMOVE_AT new_list ${main_index})
-        LIST(PREPEND new_list "${base_dir}/main.cpp")
-    ENDIF()
+# ── Platform link settings ────────────────────────────────────────────
+if(PLATFORM_MAC)
+    find_library(XPLM_LIBRARY XPLM "${XPLANE_SDK_PATH}/Libraries/Mac/")
+    target_compile_options(DogeTracker PRIVATE -O2 -Wall -Wextra -Wno-unused-parameter)
+    target_link_options(DogeTracker PRIVATE
+        -fvisibility=hidden
+        -bundle
+        -Wl,-undefined,dynamic_lookup
+    )
+    target_link_libraries(DogeTracker PRIVATE
+        "-framework Cocoa"
+        "-framework OpenGL"
+    )
+    set_target_properties(DogeTracker PROPERTIES
+        OUTPUT_NAME              "mac_x64/DogeTracker"
+        SUFFIX                   ".xpl"
+        PREFIX                   ""
+        OSX_ARCHITECTURES        "arm64;x86_64"
+    )
 
-    SET(${return_list} ${new_list} PARENT_SCOPE)
-ENDFUNCTION()
+elseif(PLATFORM_LIN)
+    find_library(XPLM_LIBRARY XPLM_64.so "${XPLANE_SDK_PATH}/Libraries/Lin/")
+    target_compile_options(DogeTracker PRIVATE -O2 -Wall -Wextra -Wno-unused-parameter -fPIC)
+    target_link_options(DogeTracker PRIVATE
+        -fvisibility=hidden
+        -nodefaultlibs
+        -fPIC
+        -rdynamic
+    )
+    target_link_libraries(DogeTracker PRIVATE ${XPLM_LIBRARY})
+    set_target_properties(DogeTracker PROPERTIES
+        OUTPUT_NAME              "lin_x64/DogeTracker"
+        SUFFIX                   ".xpl"
+        PREFIX                   ""
+    )
 
-FUNCTION(add_xplane_sdk_definitions library_name library_version) 
-    IF(APPLE)
-        TARGET_COMPILE_DEFINITIONS(${library_name} PUBLIC -DAPL=1 -DIBM=0 -DLIN=0 -DXPLANE_VERSION=${XPLANE_VERSION})
-    ELSEIF(UNIX)
-        TARGET_COMPILE_DEFINITIONS(${library_name} PUBLIC -DAPL=0 -DIBM=0 -DLIN=1 -DXPLANE_VERSION=${XPLANE_VERSION})
-        TARGET_COMPILE_OPTIONS(${library_name} PRIVATE "-static")
-        TARGET_LINK_OPTIONS(${library_name} PRIVATE "-static-libstdc++" "-static-libgcc")
-    ELSEIF(WIN32)
-        TARGET_COMPILE_OPTIONS(${library_name} PRIVATE "-static")
-        TARGET_COMPILE_DEFINITIONS(${library_name} PUBLIC -DAPL=0 -DIBM=1 -DLIN=0 -DUSING_CEF_SHARED=1 -DXPLANE_VERSION=${XPLANE_VERSION})
-        TARGET_LINK_OPTIONS(${library_name} PRIVATE "-static-libstdc++" "-static-libgcc" "-static" "-Wl,--allow-multiple-definition")
-    ENDIF()
+elseif(PLATFORM_WIN)
+    set(XPLM_LIB "${XPLANE_SDK_PATH}/Libraries/Win/XPLM_64.lib")
+    if(NOT EXISTS "${XPLM_LIB}")
+        message(FATAL_ERROR "XPLM_64.lib not found at: ${XPLM_LIB}")
+    endif()
 
-    IF(library_version EQUAL 200)
-        TARGET_COMPILE_DEFINITIONS(${library_name} PUBLIC -DXPLM200=1)
-    ELSEIF(library_version EQUAL 210)
-        TARGET_COMPILE_DEFINITIONS(${library_name} PUBLIC -DXPLM200=1 -DXPLM210=1)
-    ELSEIF(library_version EQUAL 300)
-        TARGET_COMPILE_DEFINITIONS(${library_name} PUBLIC -DXPLM200=1 -DXPLM210=1 -DXPLM300=1)
-    ELSEIF(library_version EQUAL 301)
-        TARGET_COMPILE_DEFINITIONS(${library_name} PUBLIC -DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1)
-    ELSEIF(library_version EQUAL 400)
-        TARGET_COMPILE_DEFINITIONS(${library_name} PUBLIC -DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1 -DXPLM400=1)
-    ELSEIF(library_version EQUAL 410)
-        TARGET_COMPILE_DEFINITIONS(${library_name} PUBLIC -DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1 -DXPLM400=1 -DXPLM410=1)
-    ELSEIF(library_version EQUAL 420)
-        TARGET_COMPILE_DEFINITIONS(${library_name} PUBLIC -DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1 -DXPLM400=1 -DXPLM410=1 -DXPLM411=1)
-    ELSE()
-        MESSAGE(FATAL_ERROR "Library version one of: 200, 210, 300, 301, 400, 410, 420")
-    ENDIF()
-    TARGET_INCLUDE_DIRECTORIES(${library_name} PUBLIC "${XPLANE_INCLUDES_PATH}/XPLM" "${XPLANE_INCLUDES_PATH}/Widgets" "${XPLANE_INCLUDES_PATH}/Wrappers")
-ENDFUNCTION(add_xplane_sdk_definitions)
+    find_file(WINPTHREAD_STATIC NAMES libwinpthread.a
+        PATHS /usr/x86_64-w64-mingw32/lib /usr/lib/x86_64-w64-mingw32
+        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+    if(NOT WINPTHREAD_STATIC)
+        message(FATAL_ERROR "libwinpthread.a not found. Run: sudo apt install gcc-mingw-w64-x86-64-posix")
+    endif()
 
-FUNCTION(add_xplane_plugin library_name library_version src_dir)
-    MESSAGE(STATUS "Preparing X-Plane plugin '${library_name}' at ${src_dir}")
-    FIND_SOURCE_FILES(FILES ${src_dir})
+    target_compile_options(DogeTracker PRIVATE -O2 -Wall -Wextra -Wno-unused-parameter)
+    target_link_options(DogeTracker PRIVATE
+        -static-libgcc
+        -Wl,--enable-stdcall-fixup
+        -Wl,--allow-multiple-definition
+        $<$<NOT:$<CONFIG:Debug>>:-Wl,--strip-all>
+    )
+    target_link_libraries(DogeTracker PRIVATE
+        "${XPLM_LIB}"
+        -Wl,--whole-archive "${WINPTHREAD_STATIC}" -Wl,--no-whole-archive
+        -Wl,-Bstatic -lstdc++ -Wl,-Bdynamic
+        -lws2_32 -lwininet -liphlpapi
+    )
+    set_target_properties(DogeTracker PROPERTIES
+        OUTPUT_NAME              "win_x64/DogeTracker"
+        SUFFIX                   ".xpl"
+        PREFIX                   ""
+    )
+endif()
 
-    IF(APPLE)
-        ADD_EXECUTABLE(${library_name} ${FILES})
-    ELSEIF(UNIX)
-        ADD_LIBRARY(${library_name} SHARED ${FILES})
-    ELSEIF(WIN32)
-        ADD_LIBRARY(${library_name} MODULE ${FILES})
-        # TARGET_COMPILE_DEFINITIONS(${library_name} PUBLIC -D_CRT_SECURE_NO_WARNINGS /bigobj)
-        TARGET_COMPILE_DEFINITIONS(${library_name} PUBLIC _CRT_SECURE_NO_WARNINGS)
-        # TARGET_COMPILE_OPTIONS(${library_name} PUBLIC /bigobj)
-    ENDIF()
+# ── Package: copy web/ and config.json next to the .xpl ──────────────
+set(PACKAGE_DIR "${CMAKE_BINARY_DIR}/package/DogeTracker")
 
-    IF(${library_version} LESS 300)
-        IF(APPLE)
-            SET_TARGET_PROPERTIES(${library_name} PROPERTIES OUTPUT_NAME "mac.xpl")
-        ELSEIF(UNIX)
-            SET_TARGET_PROPERTIES(${library_name} PROPERTIES OUTPUT_NAME "lin.xpl")
-        ELSEIF(WIN32)
-            SET_TARGET_PROPERTIES(${library_name} PROPERTIES OUTPUT_NAME "win.xpl")
-        ENDIF()
-    ELSE()
-        IF(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/${DIRECTORY_PREFIX}")
-            FILE(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${DIRECTORY_PREFIX}")
-        ENDIF()
-        SET_TARGET_PROPERTIES(${library_name} PROPERTIES OUTPUT_NAME "${DIRECTORY_PREFIX}/${library_name}.xpl")
-    ENDIF()
-    add_xplane_sdk_definitions(${library_name} ${library_version})
+add_custom_command(TARGET DogeTracker POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/web" "${PACKAGE_DIR}/web"
+)
+add_custom_command(TARGET DogeTracker POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/config.json" "${PACKAGE_DIR}/config.json"
+)
 
-    SET_TARGET_PROPERTIES(${library_name} PROPERTIES PREFIX "")
-    SET_TARGET_PROPERTIES(${library_name} PROPERTIES SUFFIX "")
-    SET_TARGET_PROPERTIES(${library_name} PROPERTIES LINKER_LANGUAGE CXX)
-
-    IF(APPLE)
-        SET_PROPERTY(TARGET ${library_name} APPEND_STRING PROPERTY LINK_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fPIC -fvisibility=hidden -bundle")
-    ELSEIF(WIN32)
-        #SET_PROPERTY(TARGET ${library_name} APPEND_STRING PROPERTY LINK_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -undefined_warning -fPIC -fvisibility=hidden")
-        TARGET_INCLUDE_DIRECTORIES("${PROJECT_NAME}" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/lib/${DIRECTORY_PREFIX}/curl/include")
-    ELSEIF(UNIX)
-        SET_PROPERTY(TARGET ${library_name} APPEND_STRING PROPERTY LINK_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -rdynamic -nodefaultlibs -undefined_warning -fPIC -fvisibility=hidden")
-    ENDIF()
-        
-    TARGET_LINK_LIBRARIES(${library_name} PUBLIC ${XPLM_LIBRARY} ${XPWIDGETS_LIBRARY} ${CEF_WRAPPER} ${CEF_LIBRARY} ${CURL_LIBRARY} ${OPENGL_LIBRARY} ${COCOA_LIBRARY} ${OPENSSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
-    #TARGET_LINK_LIBRARIES(${library_name} PUBLIC ${XPLM_LIBRARY} ${XPWIDGETS_LIBRARY})
-    TARGET_INCLUDE_DIRECTORIES(${library_name} PUBLIC "${XPLANE_INCLUDES_PATH}/XPLM" "${XPLANE_INCLUDES_PATH}/Widgets" "${XPLANE_INCLUDES_PATH}/Wrappers")
-    TARGET_INCLUDE_DIRECTORIES("${PROJECT_NAME}" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/lib/${DIRECTORY_PREFIX}/cef")
-    HEADER_DIRECTORIES(header_dir_list ${src_dir})
-    TARGET_INCLUDE_DIRECTORIES(${library_name} PRIVATE ${header_dir_list})
-        
-ENDFUNCTION(add_xplane_plugin)
-
-IF(NOT DEFINED XPLANE_VERSION)
-    MESSAGE(FATAL_ERROR "XPLANE_VERSION not defined")
-ENDIF()
-
-add_xplane_plugin(dogetracker 420 "${CMAKE_CURRENT_SOURCE_DIR}/src")
+message(STATUS "DogeTracker v1.0.2")
+message(STATUS "  SDK    : ${XPLANE_SDK_PATH}")
+message(STATUS "  Output : ${PACKAGE_DIR}/${PLATFORM_NAME}_x64/DogeTracker.xpl")

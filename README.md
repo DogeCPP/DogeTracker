@@ -1,175 +1,90 @@
-# ✈ DogeTracker
+# DogeTracker
 
-Real-time flight tracker for X-Plane 11/12 with **AviTab integration** and a live Leaflet map.  
-Fork of [avitab-browser](https://github.com/rswilem/avitab-browser) by TheRamon.
+A live moving map for X-Plane 12. Open your browser, point it at `http://127.0.0.1:4000`, and watch your plane move around on a real map while you fly.
 
----
+Built with a C++ X-Plane plugin that reads your simulator's flight data and serves it over a tiny local HTTP server. The frontend is just HTML, CSS, and JavaScript - no app to install, nothing to configure beyond dropping a folder into your plugins directory.
 
-## Features
-
-| Feature | Details |
-|---|---|
-| **Live position tracking** | Broadcasts lat/lon/alt/heading/speed every 5 s |
-| **See other pilots** | Leaflet map auto-refreshes with all online DogeTracker users |
-| **AviTab integration** | Map opens directly on the AviTab tablet inside the cockpit |
-| **macOS Apple Silicon** | Universal binary (arm64 + x86_64) for XP12; Intel-only for XP11 |
-| **Windows & Linux** | Unchanged from upstream |
-| **Persistent pilot ID** | UUID stored in `pilot_id.txt` — survives restarts |
+![DogeTracker screenshot](web/dogepilot.png)
 
 ---
 
-## Requirements
+## What it does
 
-### Plugin (X-Plane side)
-- X-Plane 11 or 12
-- AviTab plugin installed *(for in-cockpit map)*
-- One of: Zibo 737, LevelUp 737, Felis 742, JustFlight, or IXEG 737
-
-### Server
-- Node.js ≥ 18
-- Any always-on host (VPS, Fly.io, Railway, etc.)
-
----
-
-## Quick Start
-
-### 1. Deploy the server
-
-```bash
-cd server
-npm install
-npm start
-# Server runs on http://localhost:3000
-```
-
-Set `DOGETRACKER_API_URL` in `src/include/config.h` to your server's public URL before building the plugin.
-
-### 2. Build the plugin
-
-**macOS (Universal – Intel + Apple Silicon)**
-```bash
-./build_platforms.sh
-# Select: mac
-# X-Plane version: 12
-# → build/dist/mac_x64/dogetracker.xpl  (fat binary, runs on both chips)
-```
-
-**Windows (cross-compiled from macOS/Linux)**
-```bash
-./build_platforms.sh
-# Select: win
-```
-
-**Linux**
-```bash
-./build_platforms.sh
-# Select: lin
-# Requires Docker for the GCC cross-compile container
-```
-
-### 3. Install the plugin
-
-Copy the `dogetracker` folder from `build/dist/` into:
-```
-X-Plane/Resources/plugins/dogetracker/
-```
-
-### 4. Open the map in X-Plane
-
-- **Via AviTab**: The map loads automatically on the AviTab tablet.
-- **Via menu**: *Plugins → DogeTracker → Open DogeTracker Map*
+- Shows your aircraft position on an OpenStreetMap or satellite tile map, updating every second
+- Smooth animation between position updates so the icon doesn't teleport
+- Attitude indicator with pitch ladder and bank angle display
+- Wind rose showing current wind direction and speed
+- Vertical speed colour-coded (green for climb, red for descent)
+- Flight trail that sticks around until you clear it
+- Load a SimBrief flight plan and see the full route drawn on the map with waypoints, cruise altitude, fuel and distance info
+- Navaid overlay using free OpenStreetMap data - VORs, NDBs, and intersections, with airways as well
+- Top of Descent calculator with a visual vertical profile chart
+- Alarm system: set a countdown to your T/D and it will play an audible alert (beep, chime, or siren) and pop up a full-screen notification in your browser when it fires
+- Port is configurable without recompiling - edit config.json or use the Settings tab in the browser
 
 ---
 
-## How it works
+## Getting started
 
-```
-X-Plane sim
-  └─ dogetracker.xpl
-       ├─ Reads datarefs (lat, lon, alt, heading, speed, callsign, ICAO)
-       ├─ Every 5 s → POST /api/position  ──────────────┐
-       └─ AviTab browser → GET /map                     │
-                                                         ▼
-                                              DogeTracker Server (Node.js)
-                                                         │
-                                             ┌───────────┴────────────┐
-                                             │  In-memory pilot store │
-                                             │  (expires after 60 s)  │
-                                             └───────────┬────────────┘
-                                                         │
-                                              GET /api/users ← Leaflet map polls every 5 s
-                                              GET /map       ← Served to AviTab browser
-```
+### What you need
+- X-Plane 12 on Windows 64-bit
 
----
+### Install on your Windows machine
 
-## API Reference
+Copy the whole `DogeTracker` folder into your X-Plane plugins directory
+Start X-Plane, load a flight, and go to `http://127.0.0.1:4000` in any browser.
 
-### `POST /api/position`
-Sent by the plugin every 5 seconds.
+### Changing the port
+
+Open `config.json` and change the `port` value before starting X-Plane:
 
 ```json
 {
-  "pilot_id":  "uuid-v4",
-  "callsign":  "N737DG",
-  "aircraft":  "B738",
-  "lat":       51.477,
-  "lon":       -0.461,
-  "alt_ft":    35000,
-  "heading":   270,
-  "speed_kts": 450
+  "port": 4000
 }
 ```
 
-### `GET /api/users`
-Returns all pilots active in the last 60 seconds.
+You can also change it from the browser after the fact by going to the Settings tab. The browser-side setting persists in localStorage, so it survives page refreshes.
+
+---
+
+## Features by phase
+
+| Phase | What it covers |
+|-------|----------------|
+| 1 | Live lat/lon from X-Plane, local HTTP server, Leaflet map |
+| 2 | Heading rotation, smooth interpolation, ADI, wind rose, IAS, vertical speed, AGL |
+| 3 | SimBrief route with waypoints, aircraft type, cruise altitude, fuel, distance |
+| 4 | Navaids and airways from OpenStreetMap/Overpass API (free, no key needed). Navigraph API key stub included |
+| 5 | Top of Descent calculation, vertical profile chart, countdown alarm with Web Audio |
+
+### Navaids 
+
+Navaid data comes from OpenStreetMap via the Overpass API, which is completely free and requires no account. Toggle VORs, NDBs, and fixes independently. Airways load on demand for the current map view.
+
+If you have a Navigraph subscription you can paste your API key in the Navaids tab and the plugin is wired up to use it. The free OSM data is good enough for most use cases though.
+
+### T/D Alarm 
+
+Set your estimated time to Top of Descent using the hours/minutes inputs. Pick how many minutes before T/D you want the alarm to fire (1 to 10). When the countdown hits zero, the browser plays a sound (your choice of beep, chime, or siren) and pops up a full-screen alert. Hit "Got it" to dismiss.
+
+The vertical profile chart on the same tab shows your current altitude, the ideal 3-degree descent path, and where T/D falls. If you have a SimBrief route loaded, it also marks the destination.
+
+---
+
+## Configuration
+
+`config.json` lives next to the `64/` folder in the plugin directory. The plugin reads it at startup.
 
 ```json
 {
-  "count": 3,
-  "pilots": [
-    {
-      "pilot_id":  "uuid-v4",
-      "callsign":  "N737DG",
-      "aircraft":  "B738",
-      "lat":       51.477,
-      "lon":       -0.461,
-      "alt_ft":    35000,
-      "heading":   270,
-      "speed_kts": 450,
-      "last_seen": 1710000000000
-    }
-  ]
+  "port": 4000,
+  "theme": "dark"
 }
 ```
 
-### `GET /map`
-Serves the Leaflet live-map HTML page displayed inside AviTab.
+The `theme` value is read by the frontend as the default if you haven't toggled it manually. `port` controls which TCP port the HTTP server listens on.
 
----
+## License
 
-## Configuration (`config.h`)
-
-| Macro | Default | Description |
-|---|---|---|
-| `DOGETRACKER_API_URL` | `https://your-dogetracker-server.com` | Your server URL |
-| `DEFAULT_HOMEPAGE` | `DOGETRACKER_API_URL "/map"` | Page loaded in AviTab |
-| `TRACKER_BROADCAST_INTERVAL_SECONDS` | `5.0` | How often position is pushed |
-| `REFRESH_INTERVAL_SECONDS_SLOW` | `2.0` | Plugin flight-loop slow tick |
-| `REFRESH_INTERVAL_SECONDS_FAST` | `0.1` | Plugin flight-loop fast tick |
-
----
-
-## macOS Notes
-
-- **XP12**: CMake builds a **universal fat binary** (`arm64;x86_64`). This runs natively on both Apple Silicon Macs (M1/M2/M3/M4) and Intel Macs without Rosetta.
-- **XP11**: Intel-only (`x86_64`) — XP11 never shipped an ARM build.
-- CEF libraries: if you only have `mac_x64` CEF libs, the fat binary still works via Rosetta on Apple Silicon for the CEF portion. For a fully native arm64 CEF build, place arm64 libs in `lib/mac_arm64/cef/`.
-
----
-
-## Credits
-
-- Original [avitab-browser](https://github.com/rswilem/avitab-browser) by **TheRamon** (GPL-3.0)
-- [Leaflet.js](https://leafletjs.com/) for the map
-- [CartoDB Dark Matter](https://carto.com/basemaps/) tile layer
+MIT. Do whatever you want with it.

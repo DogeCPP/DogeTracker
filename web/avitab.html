@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DogeTracker</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #0d1117; color: #e6edf3;
+    font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ── Top bar ── */
+  #topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 10px; background: #161b22;
+    border-bottom: 1px solid #30363d; flex-shrink: 0; gap: 8px;
+    font-size: 11px;
+  }
+  #logo { font-weight: 700; color: #f7c948; font-size: 13px; }
+  #stats { display: flex; gap: 10px; flex-wrap: wrap; }
+  .st { color: #8b949e; }
+  .st b { color: #e6edf3; }
+  #dot { width: 7px; height: 7px; border-radius: 50%; background: #3fb950; flex-shrink: 0; }
+  #dot.off { background: #f85149; }
+
+  /* ── Tab bar ── */
+  #tabs {
+    display: flex; background: #161b22;
+    border-bottom: 1px solid #30363d; flex-shrink: 0;
+  }
+  .tab {
+    flex: 1; padding: 6px 4px; font-size: 11px; font-weight: 600;
+    background: none; border: none; color: #8b949e; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all .15s;
+  }
+  .tab.active { color: #f7c948; border-bottom-color: #f7c948; }
+
+  /* ── Body ── */
+  #body { flex: 1; position: relative; overflow: hidden; }
+
+  /* ── Map ── */
+  #map { position: absolute; inset: 0; }
+
+  /* ── SkyVector panel ── */
+  #panel-sky {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column;
+  }
+  #panel-sky.active { display: flex; }
+  #sky-tabs { display: flex; background: #161b22; border-bottom: 1px solid #30363d; }
+  .sky-tab {
+    flex: 1; padding: 6px; font-size: 10px; font-weight: 600;
+    background: none; border: none; color: #8b949e; cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .sky-tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+  #sky-frame { flex: 1; border: none; background: #0d1117; }
+
+  /* ── Leaflet overrides ── */
+  .leaflet-container { background: #1a2030; }
+  .leaflet-control-zoom a {
+    background: #161b22 !important; color: #e6edf3 !important;
+    border-color: #30363d !important;
+  }
+  .leaflet-control-attribution {
+    background: rgba(13,17,23,.8) !important; color: #8b949e !important; font-size: 8px;
+  }
+
+  /* ── Plane popup ── */
+  .leaflet-popup-content-wrapper {
+    background: #161b22; border: 1px solid #30363d;
+    border-radius: 8px; color: #e6edf3;
+  }
+  .leaflet-popup-tip { background: #161b22; }
+  .leaflet-popup-content { margin: 10px 12px; font-size: 11px; }
+  .pop-cs { font-size: 14px; font-weight: 700; color: #f7c948; margin-bottom: 4px; }
+  .pop-row { display: flex; justify-content: space-between; gap: 12px; margin: 2px 0; }
+  .pop-lbl { color: #8b949e; }
+  .pop-val { font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Top bar -->
+  <div id="topbar">
+    <div id="logo">🐶 DogeTracker</div>
+    <div id="stats">
+      <div class="st">ALT <b id="s-alt">--</b></div>
+      <div class="st">IAS <b id="s-ias">--</b></div>
+      <div class="st">HDG <b id="s-hdg">--</b></div>
+      <div class="st">VS <b id="s-vs">--</b></div>
+    </div>
+    <div id="dot" class="off"></div>
+  </div>
+
+  <!-- Tab bar -->
+  <div id="tabs">
+    <button class="tab active" onclick="switchTab('map',this)">🗺 Map</button>
+    <button class="tab"        onclick="switchTab('ifrl',this)">✈ IFR Lo</button>
+    <button class="tab"        onclick="switchTab('ifrh',this)">🛫 IFR Hi</button>
+    <button class="tab"        onclick="switchTab('vfr',this)">🌄 VFR</button>
+  </div>
+
+  <!-- Body -->
+  <div id="body">
+
+    <!-- Live map -->
+    <div id="map"></div>
+
+    <!-- SkyVector frames (lazy-loaded) -->
+    <div id="panel-sky">
+      <div id="sky-tabs">
+        <button class="sky-tab active" onclick="loadSky('301',this)">IFR Low</button>
+        <button class="sky-tab"        onclick="loadSky('302',this)">IFR High</button>
+        <button class="sky-tab"        onclick="loadSky('0',this)">VFR</button>
+        <button class="sky-tab"        onclick="loadSky('helitac',this)">Heli</button>
+      </div>
+      <iframe id="sky-frame" src="" allowfullscreen></iframe>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Map ──────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true, attributionControl: true })
+              .setView([20, 0], 3);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; CARTO',
+  subdomains: 'abcd', maxZoom: 18,
+}).addTo(map);
+
+let planeMarker = null;
+let trail       = [];
+let trailLine   = null;
+let following   = true;
+let connected   = false;
+
+function planeIcon(hdg) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"
+    width="28" height="28"
+    style="transform:rotate(${hdg}deg);filter:drop-shadow(0 1px 4px rgba(0,0,0,.6))">
+    <path fill="#f7c948"
+      d="M50 5 L62 40 L95 50 L62 60 L65 90 L50 80 L35 90 L38 60 L5 50 L38 40 Z"/>
+  </svg>`;
+  return L.divIcon({ html: svg, className: '', iconSize: [28,28], iconAnchor: [14,14], popupAnchor: [0,-16] });
+}
+
+function popupHtml(d) {
+  return `<div class="pop-cs">${d.heading != null ? d.heading.toFixed(0)+'°' : ''} — DogeTracker</div>
+    <div class="pop-row"><span class="pop-lbl">Altitude</span><span class="pop-val">${Math.round(d.altitude_ft).toLocaleString()} ft</span></div>
+    <div class="pop-row"><span class="pop-lbl">IAS</span><span class="pop-val">${d.airspeed_kts.toFixed(0)} kts</span></div>
+    <div class="pop-row"><span class="pop-lbl">Gnd Spd</span><span class="pop-val">${d.groundspeed_kts.toFixed(0)} kts</span></div>
+    <div class="pop-row"><span class="pop-lbl">V/S</span><span class="pop-val">${d.vspeed_fpm.toFixed(0)} fpm</span></div>
+    <div class="pop-row"><span class="pop-lbl">AGL</span><span class="pop-val">${Math.round(d.agl_ft).toLocaleString()} ft</span></div>
+    <div class="pop-row"><span class="pop-lbl">Wind</span><span class="pop-val">${d.wind_dir.toFixed(0)}° / ${d.wind_spd_kts.toFixed(0)} kts</span></div>`;
+}
+
+async function fetchPosition() {
+  try {
+    const res  = await fetch('/api/position');
+    if (!res.ok) throw new Error();
+    const d    = await res.json();
+
+    // Stats bar
+    document.getElementById('s-alt').textContent = Math.round(d.altitude_ft).toLocaleString() + ' ft';
+    document.getElementById('s-ias').textContent = d.airspeed_kts.toFixed(0) + ' kt';
+    document.getElementById('s-hdg').textContent = d.heading.toFixed(0) + '°';
+    const vs = d.vspeed_fpm;
+    document.getElementById('s-vs').textContent =
+      (vs >= 0 ? '+' : '') + vs.toFixed(0) + ' fpm';
+
+    // Connection dot
+    if (!connected) {
+      connected = true;
+      document.getElementById('dot').classList.remove('off');
+    }
+
+    const latlng = [d.lat, d.lon];
+
+    // Marker
+    if (!planeMarker) {
+      planeMarker = L.marker(latlng, { icon: planeIcon(d.heading) })
+        .bindPopup(popupHtml(d), { maxWidth: 200 })
+        .addTo(map);
+    } else {
+      planeMarker.setLatLng(latlng).setIcon(planeIcon(d.heading));
+      if (planeMarker.isPopupOpen()) planeMarker.setPopupContent(popupHtml(d));
+    }
+
+    // Trail
+    trail.push(latlng);
+    if (trail.length > 500) trail.shift();
+    if (trailLine) { map.removeLayer(trailLine); }
+    trailLine = L.polyline(trail, { color: '#f7c948', weight: 1.5, opacity: 0.5 }).addTo(map);
+
+    // Follow
+    if (following) map.setView(latlng, map.getZoom(), { animate: true });
+
+  } catch {
+    connected = false;
+    document.getElementById('dot').classList.add('off');
+  }
+}
+
+map.on('dragstart', () => { following = false; });
+
+// ── Tab switching ─────────────────────────────────────────────────────
+const skyCharts = { ifrl: '301', ifrh: '302', vfr: '0' };
+let skyLoaded = false;
+
+function switchTab(id, btn) {
+  document.querySelectorAll('#tabs .tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+
+  const panelSky = document.getElementById('panel-sky');
+  const mapEl    = document.getElementById('map');
+
+  if (id === 'map') {
+    panelSky.classList.remove('active');
+    mapEl.style.display = '';
+    following = true;
+  } else {
+    mapEl.style.display = 'none';
+    panelSky.classList.add('active');
+    const chart = skyCharts[id] || '301';
+    loadSky(chart, panelSky.querySelector('.sky-tab'));
+  }
+}
+
+function loadSky(chart, btn) {
+  document.querySelectorAll('.sky-tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const frame = document.getElementById('sky-frame');
+  // SkyVector with navaids and airways layer
+  frame.src = `https://skyvector.com/?chart=${chart}&fpl=`;
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────
+fetchPosition();
+setInterval(fetchPosition, 1000);
+</script>
+</body>
+</html>

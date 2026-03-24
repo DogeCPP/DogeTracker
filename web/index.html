@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DogeTracker</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐶</text></svg>" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="app">
+
+  
+  <aside id="sidebar">
+
+    
+    <div id="logo-bar">
+      <div id="logo-left">
+        <img src="dogepilot.png" id="doge-logo" alt="DogePilot" />
+        <div id="logo-words">
+          <span id="logo-name">DogeTracker</span>
+          <span id="logo-ver">v3.0 &nbsp;·&nbsp; X-Plane 12</span>
+        </div>
+      </div>
+      <button id="theme-btn" title="Toggle theme">☀</button>
+    </div>
+
+    
+    <div id="tab-bar">
+      <button class="tab active" data-tab="flight"  title="Flight data">✈</button>
+      <button class="tab"        data-tab="map"     title="Map controls">🗺</button>
+      <button class="tab"        data-tab="route"   title="SimBrief route">📋</button>
+      <button class="tab"        data-tab="navaids" title="Navaids &amp; airways">🔵</button>
+      <button class="tab"        data-tab="tod"     title="Top of Descent">🎯</button>
+      <button class="tab"        data-tab="settings"title="Settings">⚙</button>
+    </div>
+
+    
+    <div id="panels">
+
+      
+      <div class="panel active" id="panel-flight">
+
+        <div class="section-label">Position</div>
+        <div class="stat-grid">
+          <div class="stat"><span class="stat-lbl">Lat</span><span class="stat-val" id="v-lat">--</span></div>
+          <div class="stat"><span class="stat-lbl">Lon</span><span class="stat-val" id="v-lon">--</span></div>
+          <div class="stat"><span class="stat-lbl">Heading</span><span class="stat-val" id="v-hdg">--</span></div>
+          <div class="stat"><span class="stat-lbl">Altitude</span><span class="stat-val" id="v-alt">--</span></div>
+          <div class="stat"><span class="stat-lbl">AGL</span><span class="stat-val" id="v-agl">--</span></div>
+          <div class="stat"><span class="stat-lbl">IAS</span><span class="stat-val" id="v-ias">--</span></div>
+          <div class="stat"><span class="stat-lbl">Gnd Spd</span><span class="stat-val" id="v-gs">--</span></div>
+          <div class="stat full">
+            <span class="stat-lbl">Vert Speed</span>
+            <span class="stat-val vs-val" id="v-vs">--</span>
+          </div>
+        </div>
+
+        <div class="section-label" style="margin-top:14px">Attitude</div>
+        <div class="adi-wrap">
+          <canvas id="adi" width="200" height="200"></canvas>
+          <div class="adi-readout">
+            <span id="adi-p">Pitch --°</span>
+            <span id="adi-r">Roll --°</span>
+          </div>
+        </div>
+
+        <div class="section-label" style="margin-top:12px">Wind</div>
+        <div class="wind-row">
+          <canvas id="wind-rose" width="72" height="72"></canvas>
+          <div class="stat-grid" style="flex:1">
+            <div class="stat"><span class="stat-lbl">Direction</span><span class="stat-val" id="v-wdir">--</span></div>
+            <div class="stat"><span class="stat-lbl">Speed</span>    <span class="stat-val" id="v-wspd">--</span></div>
+          </div>
+        </div>
+      </div>
+
+      
+      <div class="panel" id="panel-map">
+        <div class="section-label">Display</div>
+        <label class="row-check"><input type="checkbox" id="opt-follow" checked /><span>Follow aircraft</span></label>
+        <label class="row-check"><input type="checkbox" id="opt-trail"  checked /><span>Show trail</span></label>
+        <label class="row-check"><input type="checkbox" id="opt-sat"            /><span>Satellite tiles</span></label>
+        <label class="row-check"><input type="checkbox" id="opt-smooth" checked /><span>Smooth movement</span></label>
+
+        <div class="section-label" style="margin-top:14px">Zoom</div>
+        <div class="slider-row">
+          <input type="range" id="zoom-sl" min="3" max="18" value="12" />
+          <span class="slider-val" id="zoom-val">12</span>
+        </div>
+
+        <div class="section-label" style="margin-top:10px">Trail length</div>
+        <div class="slider-row">
+          <input type="range" id="trail-sl" min="20" max="800" value="300" />
+          <span class="slider-val" id="trail-val">300 pts</span>
+        </div>
+
+        <button class="btn btn-sec" id="btn-centre" style="margin-top:14px">Centre on aircraft</button>
+        <button class="btn btn-sec" id="btn-clear-trail" style="margin-top:6px">Clear trail</button>
+      </div>
+
+      
+      <div class="panel" id="panel-route">
+        <div class="section-label">SimBrief <span class="badge">Phase 3</span></div>
+        <input class="text-input" type="text" id="sb-id" placeholder="Pilot ID or username" autocomplete="off" />
+        <div class="btn-pair" style="margin-top:8px">
+          <button class="btn btn-pri" id="btn-load">Load flight plan</button>
+          <button class="btn btn-dan" id="btn-clr-route">Clear</button>
+        </div>
+        <div id="sb-msg" class="msg-line"></div>
+
+        <div id="sb-data" hidden>
+          <div class="route-banner" id="rb-od">---- to ----</div>
+          <div class="flight-stats">
+            <div class="fs-row"><span>Aircraft</span><span id="fs-ac">--</span></div>
+            <div class="fs-row"><span>Cruise</span>  <span id="fs-fl">--</span></div>
+            <div class="fs-row"><span>Distance</span><span id="fs-dist">--</span></div>
+            <div class="fs-row"><span>Block fuel</span><span id="fs-fuel">--</span></div>
+            <div class="fs-row"><span>Fixes</span>  <span id="fs-fixes">--</span></div>
+          </div>
+          <div class="rte-string-wrap">
+            <div class="rte-label">Route</div>
+            <div class="rte-string" id="fs-rte">--</div>
+          </div>
+        </div>
+      </div>
+
+      
+      <div class="panel" id="panel-navaids">
+        <div class="section-label">Navaids &amp; Airways <span class="badge">Phase 4</span></div>
+        <p class="help-text">Pulls live VOR, NDB, and fix data from OpenStreetMap via Overpass API. No account needed.</p>
+
+        <label class="row-check"><input type="checkbox" id="opt-navaids" /><span>Show navaids on map</span></label>
+        <label class="row-check"><input type="checkbox" id="opt-vor"     checked /><span>VOR / DME</span></label>
+        <label class="row-check"><input type="checkbox" id="opt-ndb"     checked /><span>NDB</span></label>
+        <label class="row-check"><input type="checkbox" id="opt-fixes"   checked /><span>Intersections / fixes</span></label>
+
+        <button class="btn btn-sec" id="btn-load-navaids" style="margin-top:10px">Refresh navaids</button>
+        <div id="nav-msg" class="msg-line"></div>
+
+        <div class="section-label" style="margin-top:14px">Airways</div>
+        <label class="row-check"><input type="checkbox" id="opt-airways" /><span>Show airways (OSM)</span></label>
+        <button class="btn btn-sec" id="btn-load-airways" style="margin-top:6px">Load airways in view</button>
+        <div id="awy-msg" class="msg-line"></div>
+
+        <div class="nav-note">
+          <strong>Navigraph</strong> — full aviation chart integration requires a Navigraph subscription.
+          The plugin architecture supports it: add your API key below and the endpoints are wired up.
+          <div style="margin-top:8px">
+            <input class="text-input" type="password" id="ng-key" placeholder="Navigraph API key (optional)" />
+            <button class="btn btn-sec" id="btn-ng-save" style="margin-top:6px;width:100%">Save key</button>
+          </div>
+        </div>
+      </div>
+
+      
+      <div class="panel" id="panel-tod">
+        <div class="section-label">Descent Calculator <span class="badge">Phase 5</span></div>
+
+        <div class="tod-calc">
+          <label class="row-check"><input type="checkbox" id="opt-tod-marker" checked /><span>Show T/D marker on map</span></label>
+          <div class="section-label" style="margin-top:10px">Descent angle</div>
+          <div class="slider-row">
+            <input type="range" id="tod-angle" min="1" max="6" step="0.5" value="3" />
+            <span class="slider-val" id="tod-angle-val">3°</span>
+          </div>
+          <div class="flight-stats" style="margin-top:8px">
+            <div class="fs-row"><span>Dist to T/D</span><span id="tod-dist">--</span></div>
+            <div class="fs-row"><span>Bearing</span>    <span id="tod-brg">--</span></div>
+          </div>
+        </div>
+
+        
+        <div class="section-label" style="margin-top:14px">Vertical profile</div>
+        <canvas id="vprofile" width="260" height="110" style="width:100%;border-radius:6px"></canvas>
+
+        
+        <div class="section-label" style="margin-top:14px">Alarm</div>
+
+        <div id="alarm-banner" class="alarm-idle">
+          <span id="alarm-ico">🔕</span>
+          <span id="alarm-txt">Not armed</span>
+        </div>
+
+        <div id="countdown-box" hidden>
+          <div class="ring-wrap">
+            <svg viewBox="0 0 120 120" width="110" height="110">
+              <circle cx="60" cy="60" r="52" class="ring-bg"/>
+              <circle cx="60" cy="60" r="52" class="ring-fg" id="ring-fg"/>
+            </svg>
+            <div class="ring-inner">
+              <div class="ring-time" id="ring-time">--:--</div>
+              <div class="ring-sub"  id="ring-sub">to T/D</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tod-time-row">
+          <div class="tod-time-field">
+            <input type="number" id="tod-h" min="0" max="23" value="0" />
+            <span>h</span>
+          </div>
+          <span class="tod-colon">:</span>
+          <div class="tod-time-field">
+            <input type="number" id="tod-m" min="0" max="59" value="0" />
+            <span>m</span>
+          </div>
+        </div>
+        <p class="help-text" style="margin-top:2px">Enter your estimated time to Top of Descent</p>
+
+        <div class="section-label" style="margin-top:10px">Alarm <b id="lead-val">5</b> min before T/D</div>
+        <input type="range" id="alarm-lead" min="1" max="10" value="5" style="width:100%;accent-color:var(--accent)" />
+
+        <div class="section-label" style="margin-top:10px">Sound</div>
+        <div class="sound-opts">
+          <label class="sound-opt"><input type="radio" name="snd" value="beep"  checked /> Beep</label>
+          <label class="sound-opt"><input type="radio" name="snd" value="chime"         /> Chime</label>
+          <label class="sound-opt"><input type="radio" name="snd" value="siren"         /> Siren</label>
+        </div>
+
+        <div class="section-label" style="margin-top:10px">Volume</div>
+        <div class="slider-row">
+          <span style="font-size:12px">🔈</span>
+          <input type="range" id="alarm-vol" min="0" max="100" value="80" style="flex:1;accent-color:var(--accent)" />
+          <span style="font-size:12px">🔊</span>
+          <span class="slider-val" id="vol-val">80%</span>
+        </div>
+
+        <div class="btn-pair" style="margin-top:12px">
+          <button class="btn btn-pri" id="btn-arm">🔔 Set alarm</button>
+          <button class="btn btn-sec" id="btn-test-snd">Test</button>
+        </div>
+        <button class="btn btn-dan" id="btn-disarm" hidden style="width:100%;margin-top:6px">🔕 Cancel alarm</button>
+      </div>
+
+      
+      <div class="panel" id="panel-settings">
+        <div class="section-label">Connection</div>
+        <p class="help-text">Change this if you edited the port in config.json on your X-Plane PC.</p>
+        <div class="port-row">
+          <input class="text-input port-input" type="number" id="port-input" min="1024" max="65535" value="4000" />
+          <button class="btn btn-pri" id="btn-save-port">Apply</button>
+        </div>
+        <button class="btn btn-sec" id="btn-test-conn" style="margin-top:6px">Test connection</button>
+        <div id="conn-msg" class="msg-line"></div>
+
+        <div class="section-label" style="margin-top:18px">About</div>
+        <div class="about-block">
+          <p><strong>DogeTracker v1.0.1</strong> — open-source X-Plane 12 moving map</p>
+          <p>Connected to: <span id="host-display">127.0.0.1</span>:<span id="port-display">4000</span></p>
+          <p>GitHub: <a href="https://github.com/DogeCPP/DogeTracker" target="_blank">DogeCPP/DogeTracker</a></p>
+        </div>
+
+        <div class="section-label" style="margin-top:18px">Open on other devices</div>
+        <div class="lan-box">
+          <p>The plugin is now accessible from any device on the same WiFi or local network.</p>
+          <p style="margin-top:8px">On your phone, tablet, or another PC open:</p>
+          <div class="lan-url" id="lan-url">http://&lt;xplane-pc-ip&gt;:4000</div>
+          <p style="margin-top:8px">Find the IP in the X-Plane developer console log — look for the line that starts with <code>Network&nbsp;:</code></p>
+          <p style="margin-top:6px">On Windows you can also run <code>ipconfig</code> in Command Prompt and look for your IPv4 Address under Wi-Fi or Ethernet.</p>
+          <p style="margin-top:8px; color:var(--warn)">Note: Windows Firewall may block the first connection. If the page doesn't load on other devices, add an inbound rule for TCP port <span id="fw-port">4000</span> in Windows Defender Firewall.</p>
+        </div>
+      </div>
+
+    </div>
+
+    
+    <div id="status-bar">
+      <span id="conn-dot" class="dot dot-bad">●</span>
+      <span id="conn-lbl">Disconnected</span>
+      <span id="last-upd"></span>
+    </div>
+  </aside>
+
+  
+  <div id="map"></div>
+
+</div>
+
+<div id="alarm-overlay" hidden>
+  <div class="alarm-card">
+    <div class="alarm-plane">🛬</div>
+    <h2>TOP OF DESCENT</h2>
+    <p id="alarm-dest-txt">Time to start down.</p>
+    <button class="btn btn-pri" id="btn-dismiss" style="margin-top:20px;padding:12px 40px;font-size:15px">
+      Got it
+    </button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="script.js"></script>
+</body>
+</html>
