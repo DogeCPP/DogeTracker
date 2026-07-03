@@ -90,7 +90,8 @@ if(PLATFORM_MAC)
         "-framework OpenGL"
     )
     set_target_properties(DogeTracker PROPERTIES
-        OUTPUT_NAME              "mac_x64/DogeTracker"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/mac_x64"
+        OUTPUT_NAME              "DogeTracker"
         SUFFIX                   ".xpl"
         PREFIX                   ""
         OSX_ARCHITECTURES        "arm64;x86_64"
@@ -109,7 +110,8 @@ elseif(PLATFORM_LIN)
     )
     target_link_libraries(DogeTracker PRIVATE pthread dl)
     set_target_properties(DogeTracker PROPERTIES
-        OUTPUT_NAME              "lin_x64/DogeTracker"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lin_x64"
+        OUTPUT_NAME              "DogeTracker"
         SUFFIX                   ".xpl"
         PREFIX                   ""
     )
@@ -141,7 +143,9 @@ elseif(PLATFORM_WIN)
         -lws2_32 -lwininet -liphlpapi
     )
     set_target_properties(DogeTracker PROPERTIES
-        OUTPUT_NAME              "win_x64/DogeTracker"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/win_x64"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/win_x64"
+        OUTPUT_NAME              "DogeTracker"
         SUFFIX                   ".xpl"
         PREFIX                   ""
     )
