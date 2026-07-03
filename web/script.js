@@ -69,7 +69,7 @@ const $ = id => document.getElementById(id);
 
 function planeIcon(hdg) {
   const dk = document.documentElement.dataset.theme === 'dark';
-  const fill = dk ? '#4ea3ff' : '#0b6bcb';
+  const fill = dk ? '#6fc6c1' : '#146b64';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="46" height="46">
   <g transform="rotate(${hdg},32,32)">
     <path fill="${fill}" stroke="#0a1a33" stroke-width="1.1" stroke-linejoin="round" d="
@@ -92,7 +92,7 @@ const NAV_SVG = {
   ndb: c => `<circle cx="11" cy="11" r="8.4" fill="none" stroke="${c}" stroke-width="1.7" stroke-dasharray="1.6 2.4"/><circle cx="11" cy="11" r="2.2" fill="${c}"/>`,
   fix: c => `<path d="M11 3l8 15H3z" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round"/>`,
 };
-const NAV_COL = { vor:'#4ea3ff', ndb:'#c98adf', fix:'#90a4c4' };
+const NAV_COL = { vor:'#6fc6c1', ndb:'#d98c2b', fix:'#8c887f' };
 
 function navSymbol(kind, ident) {
   const col = NAV_COL[kind] || NAV_COL.fix;
@@ -128,7 +128,7 @@ function apply(s) {
   if (showTrail) {
     trailPts.push([s.lat,s.lon]);
     if (trailPts.length > trailMax) trailPts.shift();
-    const col = document.documentElement.dataset.theme==='dark'?'#4ea3ff':'#0b6bcb';
+    const col = document.documentElement.dataset.theme==='dark'?'#6fc6c1':'#146b64';
     if (!trailLine) trailLine = L.polyline(trailPts,{color:col,weight:2,opacity:.55}).addTo(map);
     else { trailLine.setLatLngs(trailPts); trailLine.setStyle({color:col}); }
   }
@@ -230,7 +230,7 @@ function drawWind(wDir, wSpd) {
   const W=72,H=72,cx=36,cy=36,Rr=28;
   wCtx.clearRect(0,0,W,H);
   const dk = document.documentElement.dataset.theme==='dark';
-  const fg=dk?'#6b7a96':'#6b7a96', ac='#4ea3ff';
+  const fg=dk?'#8c887f':'#6b6656', ac=dk?'#6fc6c1':'#146b64';
   wCtx.beginPath(); wCtx.arc(cx,cy,Rr,0,Math.PI*2);
   wCtx.strokeStyle=fg; wCtx.lineWidth=1; wCtx.stroke();
   wCtx.fillStyle=fg; wCtx.font='bold 7px sans-serif';
@@ -263,7 +263,7 @@ function drawProfile(s) {
   const dk = document.documentElement.dataset.theme==='dark';
   const bg = dk?'#1a2030':'#f8f9fb';
   const fg = dk?'#6b7a96':'#6b7a96';
-  const ac = dk?'#4ea3ff':'#0b6bcb';
+  const ac = dk?'#6fc6c1':'#146b64';
   const tod_col = '#e09b3d';
 
   vpCtx.clearRect(0,0,W,H);
@@ -296,7 +296,7 @@ function drawProfile(s) {
   vpCtx.fillText('NM', PAD.l+cw/2, H-2);
 
   
-  vpCtx.strokeStyle=dk?'rgba(77,159,255,.2)':'rgba(29,91,191,.2)';
+  vpCtx.strokeStyle=dk?'rgba(111,198,193,.25)':'rgba(20,107,100,.2)';
   vpCtx.lineWidth=1.5; vpCtx.setLineDash([4,3]);
   vpCtx.beginPath(); vpCtx.moveTo(tx(0),ty(alt)); vpCtx.lineTo(tx(todNm),ty(0)); vpCtx.stroke();
   vpCtx.setLineDash([]);
@@ -308,7 +308,7 @@ function drawProfile(s) {
   vpCtx.lineTo(tx(todNm), ty(0));
   vpCtx.closePath();
   const grad = vpCtx.createLinearGradient(0, PAD.t, 0, PAD.t+ch);
-  grad.addColorStop(0, dk?'rgba(77,159,255,.18)':'rgba(29,91,191,.12)');
+  grad.addColorStop(0, dk?'rgba(111,198,193,.16)':'rgba(20,107,100,.1)');
   grad.addColorStop(1, 'rgba(0,0,0,0)');
   vpCtx.fillStyle=grad; vpCtx.fill();
 
@@ -636,7 +636,7 @@ function setTheme(t) {
   document.documentElement.dataset.theme=t;
   $('theme-btn').textContent=t==='dark'?'☀':'☾';
   localStorage.setItem('dt-theme',t);
-  if(trailLine) trailLine.setStyle({color:t==='dark'?'#4ea3ff':'#0b6bcb'});
+  if(trailLine) trailLine.setStyle({color:t==='dark'?'#6fc6c1':'#146b64'});
   if(cur) drawWind(cur.wind_dir, cur.wind_spd_kts);
 }
 
