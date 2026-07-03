@@ -42,7 +42,10 @@ set(HTTPLIB_COMPILE OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(httplib)
 
 # ── Plugin target ────────────────────────────────────────────────────
-add_library(DogeTracker SHARED
+# MODULE (loadable bundle) is the correct target type for an X-Plane plugin:
+# on macOS it links as -bundle, on Linux/Windows as a shared module. Using
+# SHARED would add -dynamiclib on macOS, which conflicts with -bundle.
+add_library(DogeTracker MODULE
     src/plugin.cpp
     src/server.cpp
 )
@@ -80,7 +83,6 @@ if(PLATFORM_MAC)
     target_compile_options(DogeTracker PRIVATE -O2 -Wall -Wextra -Wno-unused-parameter)
     target_link_options(DogeTracker PRIVATE
         -fvisibility=hidden
-        -bundle
         -Wl,-undefined,dynamic_lookup
     )
     target_link_libraries(DogeTracker PRIVATE
@@ -95,15 +97,17 @@ if(PLATFORM_MAC)
     )
 
 elseif(PLATFORM_LIN)
-    find_library(XPLM_LIBRARY XPLM_64.so "${XPLANE_SDK_PATH}/Libraries/Lin/")
-    target_compile_options(DogeTracker PRIVATE -O2 -Wall -Wextra -Wno-unused-parameter -fPIC)
+    # X-Plane resolves XPLM symbols at load time, so the plugin is linked
+    # with undefined symbols allowed rather than against the SDK stub.
+    target_compile_options(DogeTracker PRIVATE -O2 -Wall -Wextra -Wno-unused-parameter -fPIC -pthread)
     target_link_options(DogeTracker PRIVATE
         -fvisibility=hidden
-        -nodefaultlibs
         -fPIC
         -rdynamic
+        -static-libstdc++
+        -static-libgcc
     )
-    target_link_libraries(DogeTracker PRIVATE ${XPLM_LIBRARY})
+    target_link_libraries(DogeTracker PRIVATE pthread dl)
     set_target_properties(DogeTracker PROPERTIES
         OUTPUT_NAME              "lin_x64/DogeTracker"
         SUFFIX                   ".xpl"

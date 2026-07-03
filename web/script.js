@@ -68,27 +68,41 @@ function todNM(alt,angle) { return alt/(Math.tan(rad(angle))*6076.12); }
 const $ = id => document.getElementById(id);
 
 function planeIcon(hdg) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 80" width="48" height="60">
-  <g transform="rotate(${hdg},32,40)">
-    <path fill="#4d9fff" stroke="#1a4fa8" stroke-width=".8" stroke-linejoin="round" d="
-      M32,5 C34,5 36,14 36,25
-      L61,47 57,52 36,38
-      C36,46 35,55 33.5,58
-      L47,69 45,72 33.5,66
-      L32,77 30,77
-      L28.5,66 19,72 17,69
-      L30.5,58
-      C29,55 28,46 28,38
-      L7,52 3,47 28,25
-      C28,14 30,5 32,5Z
-    "/>
-    <ellipse cx="32" cy="13" rx="2" ry="3.5" fill="rgba(255,255,255,.3)"/>
+  const dk = document.documentElement.dataset.theme === 'dark';
+  const fill = dk ? '#4ea3ff' : '#0b6bcb';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="46" height="46">
+  <g transform="rotate(${hdg},32,32)">
+    <path fill="${fill}" stroke="#0a1a33" stroke-width="1.1" stroke-linejoin="round" d="
+      M32 4 c2.1 0 3.5 3.5 3.7 8.8 l0.2 9.6 21.1 12.7 0 4.7 -21.2 -6.3 -0.2 11.7
+      6.7 4.8 0 3.4 -7 -2.1 -0.6 4.9 -2.4 2.6 -2.4 -2.6 -0.6 -4.9 -7 2.1 0 -3.4
+      6.7 -4.8 -0.2 -11.7 -21.2 6.3 0 -4.7 21.1 -12.7 0.2 -9.6 C28.5 7.5 29.9 4 32 4 Z"/>
+    <circle cx="32" cy="15" r="1.7" fill="rgba(255,255,255,.55)"/>
   </g>
 </svg>`;
   return L.divIcon({
     html: `<div style="filter:drop-shadow(0 2px 5px rgba(0,0,0,.55))">${svg}</div>`,
-    className:'', iconSize:[48,60], iconAnchor:[24,30], popupAnchor:[0,-32]
+    className:'', iconSize:[46,46], iconAnchor:[23,23], popupAnchor:[0,-24]
   });
+}
+
+// Aeronautical-chart style navaid symbols: hexagon = VOR, dotted circle = NDB,
+// triangle = intersection/fix. Each carries its identifier underneath.
+const NAV_SVG = {
+  vor: c => `<path d="M11 1.5l8.2 4.75v9.5L11 20.5l-8.2-4.75v-9.5z" fill="none" stroke="${c}" stroke-width="1.8"/><circle cx="11" cy="11" r="2" fill="${c}"/>`,
+  ndb: c => `<circle cx="11" cy="11" r="8.4" fill="none" stroke="${c}" stroke-width="1.7" stroke-dasharray="1.6 2.4"/><circle cx="11" cy="11" r="2.2" fill="${c}"/>`,
+  fix: c => `<path d="M11 3l8 15H3z" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round"/>`,
+};
+const NAV_COL = { vor:'#4ea3ff', ndb:'#c98adf', fix:'#90a4c4' };
+
+function navSymbol(kind, ident) {
+  const col = NAV_COL[kind] || NAV_COL.fix;
+  const sym = (NAV_SVG[kind] || NAV_SVG.fix)(col);
+  const html =
+    `<div class="nav-mark">` +
+    `<svg viewBox="0 0 22 22" width="22" height="22">${sym}</svg>` +
+    (ident ? `<span class="nav-id" style="color:${col}">${ident}</span>` : '') +
+    `</div>`;
+  return L.divIcon({ html, className:'', iconSize:[22,34], iconAnchor:[11,11], popupAnchor:[0,-11] });
 }
 
 const map = L.map('map', { center:[51.5,-0.1], zoom:12, zoomControl:true });
@@ -114,7 +128,7 @@ function apply(s) {
   if (showTrail) {
     trailPts.push([s.lat,s.lon]);
     if (trailPts.length > trailMax) trailPts.shift();
-    const col = document.documentElement.dataset.theme==='dark'?'#4d9fff':'#1d5bbf';
+    const col = document.documentElement.dataset.theme==='dark'?'#4ea3ff':'#0b6bcb';
     if (!trailLine) trailLine = L.polyline(trailPts,{color:col,weight:2,opacity:.55}).addTo(map);
     else { trailLine.setLatLngs(trailPts); trailLine.setStyle({color:col}); }
   }
@@ -135,7 +149,7 @@ function apply(s) {
 
   const vs = Math.round(s.vspeed_fpm);
   $('v-vs').textContent  = (vs>=0?'+':'')+vs.toLocaleString()+' fpm';
-  $('v-vs').className = 'stat-val '+(vs>100?'climb':vs<-100?'descend':'level');
+  $('v-vs').className = 'ro-val '+(vs>100?'climb':vs<-100?'descend':'level');
 
   $('v-wdir').textContent = Math.round(s.wind_dir)+'°';
   $('v-wspd').textContent = Math.round(s.wind_spd_kts)+' kts';
@@ -216,7 +230,7 @@ function drawWind(wDir, wSpd) {
   const W=72,H=72,cx=36,cy=36,Rr=28;
   wCtx.clearRect(0,0,W,H);
   const dk = document.documentElement.dataset.theme==='dark';
-  const fg=dk?'#6b7a96':'#6b7a96', ac='#4d9fff';
+  const fg=dk?'#6b7a96':'#6b7a96', ac='#4ea3ff';
   wCtx.beginPath(); wCtx.arc(cx,cy,Rr,0,Math.PI*2);
   wCtx.strokeStyle=fg; wCtx.lineWidth=1; wCtx.stroke();
   wCtx.fillStyle=fg; wCtx.font='bold 7px sans-serif';
@@ -249,7 +263,7 @@ function drawProfile(s) {
   const dk = document.documentElement.dataset.theme==='dark';
   const bg = dk?'#1a2030':'#f8f9fb';
   const fg = dk?'#6b7a96':'#6b7a96';
-  const ac = dk?'#4d9fff':'#1d5bbf';
+  const ac = dk?'#4ea3ff':'#0b6bcb';
   const tod_col = '#e09b3d';
 
   vpCtx.clearRect(0,0,W,H);
@@ -437,14 +451,13 @@ async function loadNavaids() {
       const t=el.tags||{};
       const type=(t['navaid:type']||t.type||'').toUpperCase();
       const name=t.name||t.ref||t['icao:name']||'';
-      let cls='nav-fix', show=showFix;
-      if (type.includes('VOR')||type.includes('DME')) { cls='nav-vor'; show=showVOR; }
-      else if (type.includes('NDB'))                  { cls='nav-ndb'; show=showNDB; }
+      let kind='fix', show=showFix;
+      if (type.includes('VOR')||type.includes('DME')) { kind='vor'; show=showVOR; }
+      else if (type.includes('NDB'))                  { kind='ndb'; show=showNDB; }
       if (!show) return;
-      const lbl = name ? name.substring(0,5) : type.substring(0,3);
+      const lbl = (t.ref||name||type).substring(0,5).toUpperCase();
       const mk=L.marker([el.lat,el.lon],{
-        icon:L.divIcon({html:`<div class="nav-tag ${cls}">${lbl}</div>`,className:'',iconAnchor:[0,8]}),
-        interactive:true, zIndexOffset:200
+        icon:navSymbol(kind,lbl), interactive:true, zIndexOffset:200
       }).bindPopup(`<b>${name||lbl}</b><br>Type: ${type||'FIX'}`+(t.frequency?`<br>Freq: ${t.frequency}`:''));
       mk.addTo(navLayer);
       cnt++;
@@ -581,8 +594,9 @@ function tickCountdown() {
 }
 
 function setBanner(cls, ico, txt) {
+  // `cls` drives both the banner state and the colour of the CSS status dot.
   $('alarm-banner').className='alarm-'+cls;
-  $('alarm-ico').textContent=ico; $('alarm-txt').textContent=txt;
+  $('alarm-txt').textContent=txt;
 }
 
 function fireAlarm() {
@@ -622,7 +636,7 @@ function setTheme(t) {
   document.documentElement.dataset.theme=t;
   $('theme-btn').textContent=t==='dark'?'☀':'☾';
   localStorage.setItem('dt-theme',t);
-  if(trailLine) trailLine.setStyle({color:t==='dark'?'#4d9fff':'#1d5bbf'});
+  if(trailLine) trailLine.setStyle({color:t==='dark'?'#4ea3ff':'#0b6bcb'});
   if(cur) drawWind(cur.wind_dir, cur.wind_spd_kts);
 }
 

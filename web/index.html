@@ -11,181 +11,202 @@
 <body>
 <div id="app">
 
-  
   <aside id="sidebar">
 
-    
-    <div id="logo-bar">
+    <!-- ── Brand header ─────────────────────────────────────────── -->
+    <header id="logo-bar">
       <div id="logo-left">
-        <img src="dogepilot.png" id="doge-logo" alt="DogePilot" />
+        <img src="dogepilot.png" id="doge-logo" alt="" />
         <div id="logo-words">
           <span id="logo-name">DogeTracker</span>
-          <span id="logo-ver">v3.0 &nbsp;·&nbsp; X-Plane 12</span>
+          <span id="logo-ver">Moving Map · X-Plane 12</span>
         </div>
       </div>
-      <button id="theme-btn" title="Toggle theme">☀</button>
-    </div>
+      <button id="theme-btn" title="Toggle light / dark" aria-label="Toggle theme"></button>
+    </header>
 
-    
-    <div id="tab-bar">
-      <button class="tab active" data-tab="flight"  title="Flight data">✈</button>
-      <button class="tab"        data-tab="map"     title="Map controls">🗺</button>
-      <button class="tab"        data-tab="route"   title="SimBrief route">📋</button>
-      <button class="tab"        data-tab="navaids" title="Navaids &amp; airways">🔵</button>
-      <button class="tab"        data-tab="tod"     title="Top of Descent">🎯</button>
-      <button class="tab"        data-tab="settings"title="Settings">⚙</button>
-    </div>
+    <!-- ── Tab rail ─────────────────────────────────────────────── -->
+    <nav id="tab-bar" role="tablist">
+      <button class="tab active" data-tab="flight"  title="Flight data" aria-label="Flight data">
+        <svg viewBox="0 0 24 24"><path d="M12 2 4 14h5l3 8 3-8h5L12 2z"/></svg>
+        <span class="tab-lbl">Flight</span>
+      </button>
+      <button class="tab" data-tab="map" title="Map controls" aria-label="Map">
+        <svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>
+        <span class="tab-lbl">Map</span>
+      </button>
+      <button class="tab" data-tab="route" title="SimBrief route" aria-label="Route">
+        <svg viewBox="0 0 24 24"><path d="M6 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM18 16a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/><path d="M6 8v4a4 4 0 0 0 4 4h4"/></svg>
+        <span class="tab-lbl">Route</span>
+      </button>
+      <button class="tab" data-tab="navaids" title="Navaids &amp; airways" aria-label="Navaids">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.4"/><path d="M6.3 6.3a8 8 0 0 0 0 11.4M17.7 6.3a8 8 0 0 1 0 11.4M9.2 9.2a4 4 0 0 0 0 5.6M14.8 9.2a4 4 0 0 1 0 5.6"/></svg>
+        <span class="tab-lbl">Navaids</span>
+      </button>
+      <button class="tab" data-tab="tod" title="Top of Descent" aria-label="Descent">
+        <svg viewBox="0 0 24 24"><path d="M3 6l7 7 4-4 7 7"/><path d="M21 10v6h-6"/></svg>
+        <span class="tab-lbl">Descent</span>
+      </button>
+      <button class="tab" data-tab="settings" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+        <span class="tab-lbl">Setup</span>
+      </button>
+    </nav>
 
-    
+    <!-- ── Panels ───────────────────────────────────────────────── -->
     <div id="panels">
 
-      
-      <div class="panel active" id="panel-flight">
+      <!-- Flight -------------------------------------------------- -->
+      <section class="panel active" id="panel-flight" role="tabpanel">
 
-        <div class="section-label">Position</div>
-        <div class="stat-grid">
-          <div class="stat"><span class="stat-lbl">Lat</span><span class="stat-val" id="v-lat">--</span></div>
-          <div class="stat"><span class="stat-lbl">Lon</span><span class="stat-val" id="v-lon">--</span></div>
-          <div class="stat"><span class="stat-lbl">Heading</span><span class="stat-val" id="v-hdg">--</span></div>
-          <div class="stat"><span class="stat-lbl">Altitude</span><span class="stat-val" id="v-alt">--</span></div>
-          <div class="stat"><span class="stat-lbl">AGL</span><span class="stat-val" id="v-agl">--</span></div>
-          <div class="stat"><span class="stat-lbl">IAS</span><span class="stat-val" id="v-ias">--</span></div>
-          <div class="stat"><span class="stat-lbl">Gnd Spd</span><span class="stat-val" id="v-gs">--</span></div>
-          <div class="stat full">
-            <span class="stat-lbl">Vert Speed</span>
-            <span class="stat-val vs-val" id="v-vs">--</span>
-          </div>
+        <div class="section-label">Primary</div>
+        <div class="readout-grid">
+          <div class="readout"><span class="ro-lbl">Latitude</span><span class="ro-val" id="v-lat">--</span></div>
+          <div class="readout"><span class="ro-lbl">Longitude</span><span class="ro-val" id="v-lon">--</span></div>
+          <div class="readout"><span class="ro-lbl">Heading</span><span class="ro-val" id="v-hdg">--</span></div>
+          <div class="readout"><span class="ro-lbl">Altitude</span><span class="ro-val" id="v-alt">--</span></div>
+          <div class="readout"><span class="ro-lbl">AGL</span><span class="ro-val" id="v-agl">--</span></div>
+          <div class="readout"><span class="ro-lbl">IAS</span><span class="ro-val" id="v-ias">--</span></div>
+          <div class="readout"><span class="ro-lbl">Ground Spd</span><span class="ro-val" id="v-gs">--</span></div>
+          <div class="readout"><span class="ro-lbl">Vertical Spd</span><span class="ro-val" id="v-vs">--</span></div>
         </div>
 
-        <div class="section-label" style="margin-top:14px">Attitude</div>
+        <div class="section-label">Attitude</div>
         <div class="adi-wrap">
           <canvas id="adi" width="200" height="200"></canvas>
           <div class="adi-readout">
             <span id="adi-p">Pitch --°</span>
+            <span class="adi-sep"></span>
             <span id="adi-r">Roll --°</span>
           </div>
         </div>
 
-        <div class="section-label" style="margin-top:12px">Wind</div>
+        <div class="section-label">Wind</div>
         <div class="wind-row">
           <canvas id="wind-rose" width="72" height="72"></canvas>
-          <div class="stat-grid" style="flex:1">
-            <div class="stat"><span class="stat-lbl">Direction</span><span class="stat-val" id="v-wdir">--</span></div>
-            <div class="stat"><span class="stat-lbl">Speed</span>    <span class="stat-val" id="v-wspd">--</span></div>
+          <div class="wind-facts">
+            <div class="readout"><span class="ro-lbl">Direction</span><span class="ro-val" id="v-wdir">--</span></div>
+            <div class="readout"><span class="ro-lbl">Speed</span><span class="ro-val" id="v-wspd">--</span></div>
           </div>
         </div>
-      </div>
+      </section>
 
-      
-      <div class="panel" id="panel-map">
+      <!-- Map ----------------------------------------------------- -->
+      <section class="panel" id="panel-map" role="tabpanel">
         <div class="section-label">Display</div>
-        <label class="row-check"><input type="checkbox" id="opt-follow" checked /><span>Follow aircraft</span></label>
-        <label class="row-check"><input type="checkbox" id="opt-trail"  checked /><span>Show trail</span></label>
-        <label class="row-check"><input type="checkbox" id="opt-sat"            /><span>Satellite tiles</span></label>
-        <label class="row-check"><input type="checkbox" id="opt-smooth" checked /><span>Smooth movement</span></label>
+        <div class="toggle-list">
+          <label class="row-check"><input type="checkbox" id="opt-follow" checked /><span class="chk"></span><span>Follow aircraft</span></label>
+          <label class="row-check"><input type="checkbox" id="opt-trail"  checked /><span class="chk"></span><span>Show trail</span></label>
+          <label class="row-check"><input type="checkbox" id="opt-sat"            /><span class="chk"></span><span>Satellite imagery</span></label>
+          <label class="row-check"><input type="checkbox" id="opt-smooth" checked /><span class="chk"></span><span>Smooth movement</span></label>
+        </div>
 
-        <div class="section-label" style="margin-top:14px">Zoom</div>
+        <div class="section-label">Zoom</div>
         <div class="slider-row">
           <input type="range" id="zoom-sl" min="3" max="18" value="12" />
           <span class="slider-val" id="zoom-val">12</span>
         </div>
 
-        <div class="section-label" style="margin-top:10px">Trail length</div>
+        <div class="section-label">Trail length</div>
         <div class="slider-row">
           <input type="range" id="trail-sl" min="20" max="800" value="300" />
           <span class="slider-val" id="trail-val">300 pts</span>
         </div>
 
-        <button class="btn btn-sec" id="btn-centre" style="margin-top:14px">Centre on aircraft</button>
-        <button class="btn btn-sec" id="btn-clear-trail" style="margin-top:6px">Clear trail</button>
-      </div>
+        <div class="btn-stack">
+          <button class="btn btn-sec" id="btn-centre">Centre on aircraft</button>
+          <button class="btn btn-ghost" id="btn-clear-trail">Clear trail</button>
+        </div>
+      </section>
 
-      
-      <div class="panel" id="panel-route">
-        <div class="section-label">SimBrief <span class="badge">Phase 3</span></div>
-        <input class="text-input" type="text" id="sb-id" placeholder="Pilot ID or username" autocomplete="off" />
-        <div class="btn-pair" style="margin-top:8px">
-          <button class="btn btn-pri" id="btn-load">Load flight plan</button>
-          <button class="btn btn-dan" id="btn-clr-route">Clear</button>
+      <!-- Route --------------------------------------------------- -->
+      <section class="panel" id="panel-route" role="tabpanel">
+        <div class="section-label">SimBrief flight plan</div>
+        <input class="text-input" type="text" id="sb-id" placeholder="SimBrief pilot ID or username" autocomplete="off" />
+        <div class="btn-pair">
+          <button class="btn btn-pri" id="btn-load">Load plan</button>
+          <button class="btn btn-ghost" id="btn-clr-route">Clear</button>
         </div>
         <div id="sb-msg" class="msg-line"></div>
 
         <div id="sb-data" hidden>
-          <div class="route-banner" id="rb-od">---- to ----</div>
-          <div class="flight-stats">
-            <div class="fs-row"><span>Aircraft</span><span id="fs-ac">--</span></div>
-            <div class="fs-row"><span>Cruise</span>  <span id="fs-fl">--</span></div>
-            <div class="fs-row"><span>Distance</span><span id="fs-dist">--</span></div>
-            <div class="fs-row"><span>Block fuel</span><span id="fs-fuel">--</span></div>
-            <div class="fs-row"><span>Fixes</span>  <span id="fs-fixes">--</span></div>
+          <div class="route-banner">
+            <span id="rb-od">---- → ----</span>
+          </div>
+          <div class="fact-table">
+            <div class="fact"><span>Aircraft</span><span id="fs-ac">--</span></div>
+            <div class="fact"><span>Cruise</span><span id="fs-fl">--</span></div>
+            <div class="fact"><span>Distance</span><span id="fs-dist">--</span></div>
+            <div class="fact"><span>Block fuel</span><span id="fs-fuel">--</span></div>
+            <div class="fact"><span>Waypoints</span><span id="fs-fixes">--</span></div>
           </div>
           <div class="rte-string-wrap">
             <div class="rte-label">Route</div>
             <div class="rte-string" id="fs-rte">--</div>
           </div>
         </div>
-      </div>
+      </section>
 
-      
-      <div class="panel" id="panel-navaids">
-        <div class="section-label">Navaids &amp; Airways <span class="badge">Phase 4</span></div>
-        <p class="help-text">Pulls live VOR, NDB, and fix data from OpenStreetMap via Overpass API. No account needed.</p>
+      <!-- Navaids ------------------------------------------------- -->
+      <section class="panel" id="panel-navaids" role="tabpanel">
+        <div class="section-label">Navaids &amp; airways</div>
+        <p class="help-text">Live VOR, NDB and fix data from OpenStreetMap via the Overpass API. Free — no account required.</p>
 
-        <label class="row-check"><input type="checkbox" id="opt-navaids" /><span>Show navaids on map</span></label>
-        <label class="row-check"><input type="checkbox" id="opt-vor"     checked /><span>VOR / DME</span></label>
-        <label class="row-check"><input type="checkbox" id="opt-ndb"     checked /><span>NDB</span></label>
-        <label class="row-check"><input type="checkbox" id="opt-fixes"   checked /><span>Intersections / fixes</span></label>
+        <label class="row-check master"><input type="checkbox" id="opt-navaids" /><span class="chk"></span><span>Show navaids on map</span></label>
 
-        <button class="btn btn-sec" id="btn-load-navaids" style="margin-top:10px">Refresh navaids</button>
+        <div class="legend-toggles">
+          <label class="row-check"><input type="checkbox" id="opt-vor" checked /><span class="chk"></span>
+            <span class="nav-legend nav-legend-vor"></span><span>VOR / DME</span></label>
+          <label class="row-check"><input type="checkbox" id="opt-ndb" checked /><span class="chk"></span>
+            <span class="nav-legend nav-legend-ndb"></span><span>NDB</span></label>
+          <label class="row-check"><input type="checkbox" id="opt-fixes" checked /><span class="chk"></span>
+            <span class="nav-legend nav-legend-fix"></span><span>Intersections</span></label>
+        </div>
+
+        <button class="btn btn-sec" id="btn-load-navaids">Refresh in view</button>
         <div id="nav-msg" class="msg-line"></div>
 
-        <div class="section-label" style="margin-top:14px">Airways</div>
-        <label class="row-check"><input type="checkbox" id="opt-airways" /><span>Show airways (OSM)</span></label>
-        <button class="btn btn-sec" id="btn-load-airways" style="margin-top:6px">Load airways in view</button>
+        <div class="section-label">Airways</div>
+        <label class="row-check"><input type="checkbox" id="opt-airways" /><span class="chk"></span><span>Show airways</span></label>
+        <button class="btn btn-sec" id="btn-load-airways">Load airways in view</button>
         <div id="awy-msg" class="msg-line"></div>
 
         <div class="nav-note">
-          <strong>Navigraph</strong> — full aviation chart integration requires a Navigraph subscription.
-          The plugin architecture supports it: add your API key below and the endpoints are wired up.
-          <div style="margin-top:8px">
-            <input class="text-input" type="password" id="ng-key" placeholder="Navigraph API key (optional)" />
-            <button class="btn btn-sec" id="btn-ng-save" style="margin-top:6px;width:100%">Save key</button>
-          </div>
+          <div class="nav-note-head">Navigraph <span class="tag-opt">optional</span></div>
+          <p>Full aviation-chart integration requires a Navigraph subscription. Paste your API key and the endpoints are wired up — the free OSM data is enough for most flights.</p>
+          <input class="text-input" type="password" id="ng-key" placeholder="Navigraph API key" />
+          <button class="btn btn-ghost" id="btn-ng-save">Save key</button>
         </div>
-      </div>
+      </section>
 
-      
-      <div class="panel" id="panel-tod">
-        <div class="section-label">Descent Calculator <span class="badge">Phase 5</span></div>
+      <!-- Descent ------------------------------------------------- -->
+      <section class="panel" id="panel-tod" role="tabpanel">
+        <div class="section-label">Descent calculator</div>
 
-        <div class="tod-calc">
-          <label class="row-check"><input type="checkbox" id="opt-tod-marker" checked /><span>Show T/D marker on map</span></label>
-          <div class="section-label" style="margin-top:10px">Descent angle</div>
-          <div class="slider-row">
-            <input type="range" id="tod-angle" min="1" max="6" step="0.5" value="3" />
-            <span class="slider-val" id="tod-angle-val">3°</span>
-          </div>
-          <div class="flight-stats" style="margin-top:8px">
-            <div class="fs-row"><span>Dist to T/D</span><span id="tod-dist">--</span></div>
-            <div class="fs-row"><span>Bearing</span>    <span id="tod-brg">--</span></div>
-          </div>
+        <label class="row-check"><input type="checkbox" id="opt-tod-marker" checked /><span class="chk"></span><span>Show T/D marker on map</span></label>
+
+        <div class="section-label">Descent angle</div>
+        <div class="slider-row">
+          <input type="range" id="tod-angle" min="1" max="6" step="0.5" value="3" />
+          <span class="slider-val" id="tod-angle-val">3°</span>
+        </div>
+        <div class="fact-table compact">
+          <div class="fact"><span>Distance to T/D</span><span id="tod-dist">--</span></div>
+          <div class="fact"><span>Bearing</span><span id="tod-brg">--</span></div>
         </div>
 
-        
-        <div class="section-label" style="margin-top:14px">Vertical profile</div>
-        <canvas id="vprofile" width="260" height="110" style="width:100%;border-radius:6px"></canvas>
+        <div class="section-label">Vertical profile</div>
+        <canvas id="vprofile" width="260" height="110"></canvas>
 
-        
-        <div class="section-label" style="margin-top:14px">Alarm</div>
-
+        <div class="section-label">Alarm</div>
         <div id="alarm-banner" class="alarm-idle">
-          <span id="alarm-ico">🔕</span>
+          <span id="alarm-ico" class="alarm-dot"></span>
           <span id="alarm-txt">Not armed</span>
         </div>
 
         <div id="countdown-box" hidden>
           <div class="ring-wrap">
-            <svg viewBox="0 0 120 120" width="110" height="110">
+            <svg viewBox="0 0 120 120" width="118" height="118">
               <circle cx="60" cy="60" r="52" class="ring-bg"/>
               <circle cx="60" cy="60" r="52" class="ring-fg" id="ring-fg"/>
             </svg>
@@ -196,96 +217,92 @@
           </div>
         </div>
 
+        <div class="section-label">Time to Top of Descent</div>
         <div class="tod-time-row">
           <div class="tod-time-field">
             <input type="number" id="tod-h" min="0" max="23" value="0" />
-            <span>h</span>
+            <span>hrs</span>
           </div>
           <span class="tod-colon">:</span>
           <div class="tod-time-field">
             <input type="number" id="tod-m" min="0" max="59" value="0" />
-            <span>m</span>
+            <span>min</span>
           </div>
         </div>
-        <p class="help-text" style="margin-top:2px">Enter your estimated time to Top of Descent</p>
 
-        <div class="section-label" style="margin-top:10px">Alarm <b id="lead-val">5</b> min before T/D</div>
-        <input type="range" id="alarm-lead" min="1" max="10" value="5" style="width:100%;accent-color:var(--accent)" />
+        <div class="section-label">Warn <b id="lead-val">5</b> min before T/D</div>
+        <input type="range" id="alarm-lead" min="1" max="10" value="5" class="wide-range" />
 
-        <div class="section-label" style="margin-top:10px">Sound</div>
-        <div class="sound-opts">
-          <label class="sound-opt"><input type="radio" name="snd" value="beep"  checked /> Beep</label>
-          <label class="sound-opt"><input type="radio" name="snd" value="chime"         /> Chime</label>
-          <label class="sound-opt"><input type="radio" name="snd" value="siren"         /> Siren</label>
+        <div class="section-label">Sound</div>
+        <div class="seg-group">
+          <label class="seg"><input type="radio" name="snd" value="beep" checked /><span>Beep</span></label>
+          <label class="seg"><input type="radio" name="snd" value="chime" /><span>Chime</span></label>
+          <label class="seg"><input type="radio" name="snd" value="siren" /><span>Siren</span></label>
         </div>
 
-        <div class="section-label" style="margin-top:10px">Volume</div>
+        <div class="section-label">Volume</div>
         <div class="slider-row">
-          <span style="font-size:12px">🔈</span>
-          <input type="range" id="alarm-vol" min="0" max="100" value="80" style="flex:1;accent-color:var(--accent)" />
-          <span style="font-size:12px">🔊</span>
+          <input type="range" id="alarm-vol" min="0" max="100" value="80" />
           <span class="slider-val" id="vol-val">80%</span>
         </div>
 
-        <div class="btn-pair" style="margin-top:12px">
-          <button class="btn btn-pri" id="btn-arm">🔔 Set alarm</button>
-          <button class="btn btn-sec" id="btn-test-snd">Test</button>
+        <div class="btn-pair">
+          <button class="btn btn-pri" id="btn-arm">Set alarm</button>
+          <button class="btn btn-ghost" id="btn-test-snd">Test</button>
         </div>
-        <button class="btn btn-dan" id="btn-disarm" hidden style="width:100%;margin-top:6px">🔕 Cancel alarm</button>
-      </div>
+        <button class="btn btn-dan btn-full" id="btn-disarm" hidden>Cancel alarm</button>
+      </section>
 
-      
-      <div class="panel" id="panel-settings">
+      <!-- Settings ------------------------------------------------ -->
+      <section class="panel" id="panel-settings" role="tabpanel">
         <div class="section-label">Connection</div>
-        <p class="help-text">Change this if you edited the port in config.json on your X-Plane PC.</p>
+        <p class="help-text">Set this to match the <code>port</code> in <code>config.json</code> on your X-Plane PC.</p>
         <div class="port-row">
           <input class="text-input port-input" type="number" id="port-input" min="1024" max="65535" value="4000" />
           <button class="btn btn-pri" id="btn-save-port">Apply</button>
         </div>
-        <button class="btn btn-sec" id="btn-test-conn" style="margin-top:6px">Test connection</button>
+        <button class="btn btn-sec" id="btn-test-conn">Test connection</button>
         <div id="conn-msg" class="msg-line"></div>
 
-        <div class="section-label" style="margin-top:18px">About</div>
-        <div class="about-block">
-          <p><strong>DogeTracker v1.0.1</strong> — open-source X-Plane 12 moving map</p>
-          <p>Connected to: <span id="host-display">127.0.0.1</span>:<span id="port-display">4000</span></p>
-          <p>GitHub: <a href="https://github.com/DogeCPP/DogeTracker" target="_blank">DogeCPP/DogeTracker</a></p>
+        <div class="section-label">About</div>
+        <div class="fact-table">
+          <div class="fact"><span>Version</span><span>DogeTracker v1.0.2</span></div>
+          <div class="fact"><span>Connected to</span><span><span id="host-display">127.0.0.1</span>:<span id="port-display">4000</span></span></div>
+          <div class="fact"><span>Source</span><span><a href="https://github.com/DogeCPP/DogeTracker" target="_blank" rel="noopener">DogeCPP/DogeTracker</a></span></div>
         </div>
 
-        <div class="section-label" style="margin-top:18px">Open on other devices</div>
+        <div class="section-label">Open on other devices</div>
         <div class="lan-box">
-          <p>The plugin is now accessible from any device on the same WiFi or local network.</p>
-          <p style="margin-top:8px">On your phone, tablet, or another PC open:</p>
+          <p>Reachable from any device on the same network.</p>
           <div class="lan-url" id="lan-url">http://&lt;xplane-pc-ip&gt;:4000</div>
-          <p style="margin-top:8px">Find the IP in the X-Plane developer console log — look for the line that starts with <code>Network&nbsp;:</code></p>
-          <p style="margin-top:6px">On Windows you can also run <code>ipconfig</code> in Command Prompt and look for your IPv4 Address under Wi-Fi or Ethernet.</p>
-          <p style="margin-top:8px; color:var(--warn)">Note: Windows Firewall may block the first connection. If the page doesn't load on other devices, add an inbound rule for TCP port <span id="fw-port">4000</span> in Windows Defender Firewall.</p>
+          <p>Find the IP in the X-Plane developer console (line starting <code>Network:</code>), or run <code>ipconfig</code> on Windows.</p>
+          <p class="warn-text">Windows Firewall may block the first connection — allow inbound TCP port <span id="fw-port">4000</span> if the page won't load elsewhere.</p>
         </div>
-      </div>
+      </section>
 
     </div>
 
-    
+    <!-- ── Status bar ───────────────────────────────────────────── -->
     <div id="status-bar">
-      <span id="conn-dot" class="dot dot-bad">●</span>
+      <span id="conn-dot" class="dot dot-bad"></span>
       <span id="conn-lbl">Disconnected</span>
       <span id="last-upd"></span>
     </div>
   </aside>
 
-  
   <div id="map"></div>
 
 </div>
 
+<!-- ── Full-screen T/D alarm ─────────────────────────────────────── -->
 <div id="alarm-overlay" hidden>
   <div class="alarm-card">
-    <div class="alarm-plane">🛬</div>
+    <div class="alarm-plane">
+      <svg viewBox="0 0 24 24"><path d="M3 6l7 7 4-4 7 7"/><path d="M21 10v6h-6"/></svg>
+    </div>
     <h2>TOP OF DESCENT</h2>
     <p id="alarm-dest-txt">Time to start down.</p>
-    <button class="btn btn-pri" id="btn-dismiss" style="margin-top:20px;padding:12px 40px;font-size:15px">
-      Got it
-    </button>
+    <button class="btn btn-pri btn-lg" id="btn-dismiss">Got it</button>
   </div>
 </div>
 
