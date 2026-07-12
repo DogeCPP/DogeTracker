@@ -140,6 +140,9 @@ jobs:
     name: Package Release
     runs-on: ubuntu-latest
     needs: [ build-mac, build-win, build-lin ]
+    # Needed so the tag build can publish a GitHub Release.
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
