@@ -16,8 +16,54 @@ struct DogeServerImpl {
     std::atomic<bool> running { false };
     std::mutex        mtx;
     AircraftState     state;
+    std::mutex        planMtx;
+    FlightPlan        plan;
 
     DogeServerImpl(const std::string& dir, int p) : webDir(dir), port(p) {}
+
+    static std::string jsonEscape(const std::string& in) {
+        std::string out;
+        out.reserve(in.size() + 4);
+        for (char c : in) {
+            switch (c) {
+                case '"':  out += "\\\""; break;
+                case '\\': out += "\\\\"; break;
+                case '\n': out += "\\n";  break;
+                case '\r': out += "\\r";  break;
+                case '\t': out += "\\t";  break;
+                default:
+                    if (static_cast<unsigned char>(c) < 0x20) {
+                        char u[8];
+                        std::snprintf(u, sizeof(u), "\\u%04x", c);
+                        out += u;
+                    } else {
+                        out += c;
+                    }
+            }
+        }
+        return out;
+    }
+
+    std::string flightPlanToJSON() {
+        std::lock_guard<std::mutex> lk(planMtx);
+        std::string out = "{\"source\":\"fms\",\"count\":";
+        out += std::to_string(plan.waypoints.size());
+        out += ",\"waypoints\":[";
+        for (size_t i = 0; i < plan.waypoints.size(); ++i) {
+            const FmsWaypoint& w = plan.waypoints[i];
+            char coords[128];
+            std::snprintf(coords, sizeof(coords),
+                          "\"lat\":%.6f,\"lon\":%.6f,\"altFt\":%d",
+                          w.lat, w.lon, w.altFt);
+            if (i) out += ',';
+            out += "{\"ident\":\"" + jsonEscape(w.ident) + "\",";
+            out += "\"type\":\""  + jsonEscape(w.type)  + "\",";
+            out += coords;
+            out += '}';
+        }
+        out += "]}";
+        return out;
+    }
 
     std::string stateToJSON() {
         std::lock_guard<std::mutex> lk(mtx);
@@ -59,10 +105,16 @@ struct DogeServerImpl {
 
         svr.Get("/api/health", [hdr](const httplib::Request&, httplib::Response& res) {
             hdr(res);
-            res.set_content("{\"status\":\"ok\",\"plugin\":\"DogeTracker\",\"version\":\"1.0.2\"}", "application/json");
+            res.set_content("{\"status\":\"ok\",\"plugin\":\"DogeTracker\",\"version\":\"1.3.0\"}", "application/json");
         });
 
-        // AviTab-optimised cockpit map — set homepage=http://localhost:4000/avitab in AviTab config
+        // Active FMS flight plan, refreshed on the sim main thread.
+        svr.Get("/api/flightplan", [this, hdr](const httplib::Request&, httplib::Response& res) {
+            hdr(res);
+            res.set_content(flightPlanToJSON(), "application/json");
+        });
+
+        // AviTab-optimised cockpit map. Set homepage=http://localhost:4000/avitab in AviTab config
         svr.Get("/avitab", [this](const httplib::Request&, httplib::Response& res) {
             std::string path = webDir + "/avitab.html";
             std::ifstream f(path);
@@ -123,4 +175,9 @@ void WebServer::Stop() {
 void WebServer::UpdateState(const AircraftState& s) {
     std::lock_guard<std::mutex> lk(impl_->mtx);
     impl_->state = s;
+}
+
+void WebServer::UpdateFlightPlan(const FlightPlan& fp) {
+    std::lock_guard<std::mutex> lk(impl_->planMtx);
+    impl_->plan = fp;
 }

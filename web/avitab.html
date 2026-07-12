@@ -153,7 +153,7 @@ function planeIcon(hdg) {
 }
 
 function popupHtml(d) {
-  return `<div class="pop-cs">${d.heading != null ? d.heading.toFixed(0)+'°' : ''} — DogeTracker</div>
+  return `<div class="pop-cs">${d.heading != null ? d.heading.toFixed(0)+'°' : ''} · DogeTracker</div>
     <div class="pop-row"><span class="pop-lbl">Altitude</span><span class="pop-val">${Math.round(d.altitude_ft).toLocaleString()} ft</span></div>
     <div class="pop-row"><span class="pop-lbl">IAS</span><span class="pop-val">${d.airspeed_kts.toFixed(0)} kts</span></div>
     <div class="pop-row"><span class="pop-lbl">Gnd Spd</span><span class="pop-val">${d.groundspeed_kts.toFixed(0)} kts</span></div>

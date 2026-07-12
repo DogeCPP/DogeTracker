@@ -4,6 +4,7 @@
 #include <mutex>
 #include <atomic>
 #include <memory>
+#include <vector>
 
 struct AircraftState {
     double lat             = 0.0;
@@ -20,6 +21,19 @@ struct AircraftState {
     float  wind_spd_kts    = 0.0f;
 };
 
+// One leg of the active FMS flight plan, read from the sim on the main thread.
+struct FmsWaypoint {
+    std::string ident;
+    std::string type;   // APT, VOR, NDB, FIX, LATLON, WPT
+    double      lat   = 0.0;
+    double      lon   = 0.0;
+    int         altFt = 0;
+};
+
+struct FlightPlan {
+    std::vector<FmsWaypoint> waypoints;
+};
+
 struct DogeServerImpl;
 
 class WebServer {
@@ -29,6 +43,7 @@ public:
     void Start();
     void Stop();
     void UpdateState(const AircraftState& s);
+    void UpdateFlightPlan(const FlightPlan& fp);
 private:
     std::unique_ptr<DogeServerImpl> impl_;
 };

@@ -365,10 +365,60 @@ async function poll() {
   setTimeout(poll, POLL);
 }
 
-async function loadSimbrief(id) {
-  const msg=$('sb-msg');
-  msg.className='msg-line'; msg.textContent='Loading...';
+function setRouteMsg(cls, txt) {
+  const m=$('sb-msg');
+  m.className='msg-line'+(cls?' '+cls:'');
+  m.textContent=txt;
+}
+
+// Sum the great-circle legs and pull a cruise level out of the waypoint list,
+// used for plans that don't come with their own summary (FMS and files).
+function routeStats(fixes) {
+  let dist=0;
+  for (let i=1;i<fixes.length;i++) dist+=gcNM(fixes[i-1].lat,fixes[i-1].lon,fixes[i].lat,fixes[i].lon);
+  const maxAlt=fixes.reduce((m,f)=>Math.max(m,f.altFt||0),0);
+  return {
+    distanceNM: Math.round(dist),
+    cruiseFL: maxAlt>=1000 ? 'FL'+Math.round(maxAlt/100) : (maxAlt?maxAlt+' ft':'--')
+  };
+}
+
+// Single entry point for every source: draw the line, fill the info panel.
+function showRoute(route) {
   clearRoute();
+  const fixes=route.waypoints;
+  sbRoute={ waypoints:fixes, dest:route.dest };
+  drawRoute(fixes);
+
+  const m=route.meta||{};
+  $('rb-od').textContent    = (route.originIcao||'----')+' to '+(route.destIcao||'----');
+  $('rb-src').textContent   = route.source||'';
+  $('fs-ac').textContent    = m.aircraft||'--';
+  $('fs-fl').textContent    = m.cruiseFL||'--';
+  $('fs-dist').textContent  = (m.distanceNM!=null?m.distanceNM:'--')+' NM';
+  $('fs-fuel').textContent  = m.fuelKg||'--';
+  $('fs-fixes').textContent = fixes.length;
+  $('fs-rte').textContent   = m.routeStr||fixes.map(f=>f.ident).join(' ');
+  $('sb-data').hidden=false;
+
+  setRouteMsg('ok', fixes.length+' waypoints loaded from '+(route.source||'plan').toLowerCase());
+}
+
+// FMS and file plans share the same computed-summary path.
+function showGenericRoute(fixes, source) {
+  const st=routeStats(fixes);
+  const first=fixes[0], last=fixes[fixes.length-1];
+  showRoute({
+    source, waypoints:fixes,
+    originIcao:first.ident, destIcao:last.ident,
+    dest:{ lat:last.lat, lon:last.lon, icao:last.ident },
+    meta:{ aircraft:'--', cruiseFL:st.cruiseFL, distanceNM:st.distanceNM, fuelKg:'--',
+           routeStr:fixes.map(f=>f.ident).join(' ') }
+  });
+}
+
+async function loadSimbrief(id) {
+  setRouteMsg('', 'Loading from SimBrief...');
   try {
     const url=`https://www.simbrief.com/api/xml.fetcher.php?username=${encodeURIComponent(id)}&json=1`;
     const r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status);
@@ -379,55 +429,133 @@ async function loadSimbrief(id) {
       .map(f=>({ident:f.ident||'?',lat:+f.pos_lat,lon:+f.pos_long,altFt:+(f.altitude_feet||0)}));
     if (fixes.length<2) throw new Error('No waypoints found in plan');
 
-    const orig=d.origin?.icao_code||'----', dst=d.destination?.icao_code||'----';
-    sbRoute = {
-      waypoints:fixes,
-      dest:{ lat:+d.destination.pos_lat, lon:+d.destination.pos_long, icao:dst }
-    };
-    drawRoute(fixes);
-
-    $('rb-od').textContent      = orig+' to '+dst;
-    $('fs-ac').textContent      = d.aircraft?.icaocode||d.aircraft?.name||'--';
-    $('fs-fl').textContent      = 'FL'+(d.general?.cruise_altitude||'--');
-    $('fs-dist').textContent    = (d.general?.route_distance||'--')+' NM';
-    const fuel = d.fuel?.plan_ramp;
-    $('fs-fuel').textContent    = fuel ? (+fuel).toLocaleString()+' kg' : '--';
-    $('fs-fixes').textContent   = fixes.length;
-    $('fs-rte').textContent     = d.general?.route_ifps||'DCT';
-    $('sb-data').hidden=false;
-
-    msg.className='msg-line ok';
-    msg.textContent=fixes.length+' fixes loaded';
+    const fuel=d.fuel?.plan_ramp;
+    showRoute({
+      source:'SimBrief', waypoints:fixes,
+      originIcao:d.origin?.icao_code||'----', destIcao:d.destination?.icao_code||'----',
+      dest:{ lat:+d.destination.pos_lat, lon:+d.destination.pos_long, icao:d.destination?.icao_code||'----' },
+      meta:{
+        aircraft:d.aircraft?.icaocode||d.aircraft?.name||'--',
+        cruiseFL:'FL'+(d.general?.cruise_altitude||'--'),
+        distanceNM:d.general?.route_distance!=null?+d.general.route_distance:null,
+        fuelKg:fuel?(+fuel).toLocaleString()+' kg':'--',
+        routeStr:d.general?.route_ifps||'DCT'
+      }
+    });
   } catch(e) {
-    msg.className='msg-line err'; msg.textContent=e.message;
+    setRouteMsg('err', e.message);
+  }
+}
+
+async function loadFMS() {
+  setRouteMsg('', 'Reading the active FMS plan from the sim...');
+  try {
+    const r=await fetch(`http://${HOST}:${PORT}/api/flightplan`,{cache:'no-store'});
+    if(!r.ok) throw new Error('Plugin not reachable (HTTP '+r.status+')');
+    const d=await r.json();
+    const fixes=(d.waypoints||[])
+      .filter(w=>Number.isFinite(w.lat)&&Number.isFinite(w.lon))
+      .map(w=>({ident:(w.ident||w.type||'WPT').trim()||'WPT',lat:w.lat,lon:w.lon,altFt:w.altFt||0}));
+    if(fixes.length<2) throw new Error('No active flight plan in the sim FMS');
+    showGenericRoute(fixes, 'Sim FMS');
+  } catch(e) {
+    setRouteMsg('err', e.message);
+  }
+}
+
+// X-Plane .fms, both the old v3 and the current v11 layout. Every real
+// waypoint row ends in lat/lon and starts with a numeric type code, so we
+// key off that rather than tracking the header line by line.
+function parseXplaneFms(text) {
+  const fixes=[];
+  for (const raw of text.split(/\r?\n/)) {
+    const line=raw.trim();
+    if(!line) continue;
+    const t=line.split(/\s+/);
+    if(t.length<3 || !/^\d+$/.test(t[0])) continue;
+    const lat=parseFloat(t[t.length-2]), lon=parseFloat(t[t.length-1]);
+    if(!Number.isFinite(lat)||!Number.isFinite(lon)) continue;
+    if(Math.abs(lat)>90||Math.abs(lon)>180||(lat===0&&lon===0)) continue;
+    let alt=t.length>=4?parseFloat(t[t.length-3]):0;
+    if(!Number.isFinite(alt)) alt=0;
+    let ident=t[1];
+    if(!ident||/^-?\d/.test(ident)) ident=(t[0]==='28')?'LATLON':'WPT';
+    fixes.push({ident,lat,lon,altFt:Math.round(alt)});
+  }
+  return fixes;
+}
+
+// Little Navmap .lnmpln is XML with a Waypoints list of Pos elements.
+function parseLnmpln(text) {
+  const doc=new DOMParser().parseFromString(text,'application/xml');
+  if(doc.querySelector('parsererror')) throw new Error('That file is not valid XML');
+  const fixes=[];
+  doc.querySelectorAll('Waypoint').forEach(w=>{
+    const pos=w.querySelector('Pos'); if(!pos) return;
+    const lat=parseFloat(pos.getAttribute('Lat')), lon=parseFloat(pos.getAttribute('Lon'));
+    if(!Number.isFinite(lat)||!Number.isFinite(lon)) return;
+    const ident=(w.querySelector('Ident')?.textContent||w.querySelector('Name')?.textContent||'WPT').trim();
+    let alt=parseFloat(pos.getAttribute('Alt'));
+    fixes.push({ident,lat,lon,altFt:Number.isFinite(alt)?Math.round(alt):0});
+  });
+  return fixes;
+}
+
+async function loadPlanFile(file) {
+  if(!file) return;
+  setRouteMsg('', 'Reading '+file.name+'...');
+  try {
+    const text=await file.text();
+    const isLnm=/\.lnmpln$/i.test(file.name)||/<LittleNavmap/i.test(text);
+    const fixes=isLnm?parseLnmpln(text):parseXplaneFms(text);
+    if(!fixes||fixes.length<2) throw new Error('No usable waypoints in that file');
+    showGenericRoute(fixes, 'File');
+  } catch(e) {
+    setRouteMsg('err', e.message);
   }
 }
 
 function drawRoute(fixes) {
   if (routeLayer) { map.removeLayer(routeLayer); routeLayer=null; }
   routeLayer = L.layerGroup();
-  L.polyline(fixes.map(f=>[f.lat,f.lon]),{color:'#e09b3d',weight:2.5,opacity:.85,dashArray:'6 4'}).addTo(routeLayer);
-  const step=Math.max(1,Math.floor(fixes.length/16));
+
+  const latlngs=fixes.map(f=>[f.lat,f.lon]);
+  const dk=document.documentElement.dataset.theme==='dark';
+  const line   = dk ? '#e0a13a' : '#a8621a';
+  const casing = dk ? 'rgba(0,0,0,.6)' : 'rgba(255,255,255,.75)';
+  const endFill= dk ? '#0c0c0b' : '#ffffff';
+
+  L.polyline(latlngs,{color:casing,weight:5,opacity:.9,lineJoin:'round',lineCap:'round'}).addTo(routeLayer);
+  L.polyline(latlngs,{color:line,weight:2.2,opacity:.95,lineJoin:'round',lineCap:'round'}).addTo(routeLayer);
+
+  const step=Math.max(1,Math.round(fixes.length/14));
   fixes.forEach((f,i)=>{
-    const end=i===0||i===fixes.length-1, col=end?'#e05c5c':'#e09b3d', r=end?6:3;
-    L.circleMarker([f.lat,f.lon],{radius:r,color:col,fillColor:col,fillOpacity:.95,weight:1.2})
-     .bindPopup(`<b>${f.ident}</b><br>${f.lat.toFixed(4)}, ${f.lon.toFixed(4)}`+(f.altFt?`<br>${f.altFt.toLocaleString()} ft`:'')).addTo(routeLayer);
-    if (end||i%step===0)
+    const end=i===0||i===fixes.length-1;
+    L.circleMarker([f.lat,f.lon],{
+      radius:end?5:2.6, color:line, weight:end?2:1,
+      fillColor:end?endFill:line, fillOpacity:1
+    }).bindPopup(`<b>${f.ident}</b><br>${f.lat.toFixed(4)}, ${f.lon.toFixed(4)}`
+      +(f.altFt?`<br>${f.altFt.toLocaleString()} ft`:'')).addTo(routeLayer);
+
+    if (end||i%step===0) {
+      const fl=f.altFt>=1000?`<span class="wp-fl">FL${Math.round(f.altFt/100)}</span>`:'';
       L.marker([f.lat,f.lon],{
-        icon:L.divIcon({html:`<div class="wp-tag">${f.ident}</div>`,className:'',iconAnchor:[-3,8]}),
-        interactive:false,zIndexOffset:500
+        icon:L.divIcon({html:`<div class="wp-tag"><span class="wp-id">${f.ident}</span>${fl}</div>`,className:'',iconAnchor:[-5,9]}),
+        interactive:false, zIndexOffset:500
       }).addTo(routeLayer);
+    }
   });
+
   routeLayer.addTo(map);
-  map.fitBounds(L.latLngBounds(fixes.map(f=>[f.lat,f.lon])),{padding:[40,40]});
+  if(latlngs.length) map.fitBounds(L.latLngBounds(latlngs),{padding:[45,45]});
 }
 
 function clearRoute() {
   if (routeLayer) { map.removeLayer(routeLayer); routeLayer=null; }
   sbRoute=null;
   $('sb-data').hidden=true;
-  $('sb-msg').className='msg-line';
-  $('sb-msg').textContent='';
+  $('rb-src').textContent='';
+  setRouteMsg('', '');
 }
 
 async function loadNavaids() {
@@ -634,7 +762,6 @@ function disarm() {
 
 function setTheme(t) {
   document.documentElement.dataset.theme=t;
-  $('theme-btn').textContent=t==='dark'?'☀':'☾';
   localStorage.setItem('dt-theme',t);
   if(trailLine) trailLine.setStyle({color:t==='dark'?'#6fc6c1':'#146b64'});
   if(cur) drawWind(cur.wind_dir, cur.wind_spd_kts);
@@ -674,10 +801,19 @@ $('btn-centre').addEventListener('click',()=>{if(cur){followAc=true;$('opt-follo
 $('btn-clear-trail').addEventListener('click',()=>{trailPts=[];if(trailLine){map.removeLayer(trailLine);trailLine=null;}});
 map.on('dragstart',()=>{followAc=false;$('opt-follow').checked=false;});
 
-$('btn-load').addEventListener('click',()=>{const id=$('sb-id').value.trim();if(!id){$('sb-msg').className='msg-line err';$('sb-msg').textContent='Enter your SimBrief Pilot ID or username';return;}loadSimbrief(id);});
+// Filled SimBrief box loads SimBrief; empty box falls back to the sim FMS.
+$('btn-load').addEventListener('click',()=>{const id=$('sb-id').value.trim();if(id)loadSimbrief(id);else loadFMS();});
 $('sb-id').addEventListener('keydown',e=>{if(e.key==='Enter')$('btn-load').click();});
 $('btn-clr-route').addEventListener('click',clearRoute);
 $('sb-id').addEventListener('input',e=>localStorage.setItem('dt-sbid',e.target.value.trim()));
+$('btn-fms').addEventListener('click',loadFMS);
+$('fp-file').addEventListener('change',e=>{loadPlanFile(e.target.files[0]);e.target.value='';});
+(function(){
+  const drop=$('fp-drop'); if(!drop) return;
+  ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag');}));
+  ['dragleave','dragend'].forEach(ev=>drop.addEventListener(ev,()=>drop.classList.remove('drag')));
+  drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag');if(e.dataTransfer.files[0])loadPlanFile(e.dataTransfer.files[0]);});
+})();
 
 $('opt-navaids').addEventListener('change',e=>{showNavaids=e.target.checked;if(showNavaids)loadNavaids();else if(navLayer){map.removeLayer(navLayer);navLayer=null;}});
 $('opt-vor').addEventListener('change',e=>{showVOR=e.target.checked;if(showNavaids)loadNavaids();});

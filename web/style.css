@@ -235,10 +235,27 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
 /* route */
 .route-banner {
-  margin: 12px 0 9px; padding: 10px; text-align: center;
+  margin: 12px 0 9px; padding: 10px 12px;
   background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent);
   color: var(--text); font-size: 15px; font-weight: 700; letter-spacing: .3px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
+.route-src {
+  font-family: var(--font); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--accent); border: 1px solid var(--accent); padding: 2px 6px; white-space: nowrap;
+}
+.route-src:empty { display: none; }
+
+/* file plan picker */
+.file-drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 14px 10px; text-align: center; cursor: pointer;
+  background: var(--panel-2); border: 1px dashed var(--border-2);
+  transition: border-color var(--tr), background var(--tr);
+}
+.file-drop:hover, .file-drop.drag { border-color: var(--accent); background: var(--panel); }
+.file-drop-main { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.file-drop-sub { font-size: 10.5px; color: var(--faint); }
 .fact-table { border: 1px solid var(--border); }
 .fact {
   display: flex; justify-content: space-between; align-items: center; gap: 10px;
@@ -365,10 +382,12 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   padding: 2px 7px; white-space: nowrap; pointer-events: none; letter-spacing: .2px;
 }
 .wp-tag {
-  background: rgba(10,10,9,.82); color: #eae7df; font-size: 9.5px; font-weight: 600;
-  padding: 2px 5px; white-space: nowrap; pointer-events: none; letter-spacing: .2px;
+  display: inline-flex; flex-direction: column; line-height: 1.15;
+  background: rgba(10,10,9,.82); padding: 2px 5px; white-space: nowrap; pointer-events: none;
   border: 1px solid rgba(255,255,255,.12);
 }
+.wp-tag .wp-id { color: #eae7df; font-size: 9.5px; font-weight: 700; letter-spacing: .2px; }
+.wp-tag .wp-fl { color: #e0a13a; font-size: 8px; font-weight: 600; letter-spacing: .2px; }
 .nav-mark { position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none; }
 .nav-mark svg { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
 .nav-mark .nav-id {

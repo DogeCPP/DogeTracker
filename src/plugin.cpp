@@ -2,6 +2,7 @@
 #include "XPLMProcessing.h"
 #include "XPLMDataAccess.h"
 #include "XPLMUtilities.h"
+#include "XPLMNavigation.h"
 #include "server.h"
 #include "config_reader.h"
 
@@ -25,6 +26,7 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <utility>
 
 static std::unique_ptr<WebServer> g_server;
 
@@ -96,6 +98,44 @@ static void LogNetworkAddresses(int port) {
 #endif
 }
 
+static const char* FmsTypeName(XPLMNavType t) {
+    if (t & xplm_Nav_Airport) return "APT";
+    if (t & xplm_Nav_VOR)     return "VOR";
+    if (t & xplm_Nav_NDB)     return "NDB";
+    if (t & xplm_Nav_Fix)     return "FIX";
+    if (t & xplm_Nav_LatLon)  return "LATLON";
+    return "WPT";
+}
+
+// Read the active FMS flight plan. XPLM nav calls are only valid on the
+// main thread, so this runs inside the flight loop and the result is cached
+// in the server for the HTTP thread to serve.
+static FlightPlan ReadFMS() {
+    FlightPlan fp;
+    int count = XPLMCountFMSEntries();
+    fp.waypoints.reserve(count > 0 ? count : 0);
+    for (int i = 0; i < count; ++i) {
+        XPLMNavType type = xplm_Nav_Unknown;
+        char        id[256] = {0};
+        XPLMNavRef  ref = XPLM_NAV_NOT_FOUND;
+        int         alt = 0;
+        float       lat = 0.0f, lon = 0.0f;
+        XPLMGetFMSEntryInfo(i, &type, id, &ref, &alt, &lat, &lon);
+
+        // Skip empty or not-yet-populated slots.
+        if (lat == 0.0f && lon == 0.0f) continue;
+
+        FmsWaypoint w;
+        w.ident = id;
+        w.type  = FmsTypeName(type);
+        w.lat   = lat;
+        w.lon   = lon;
+        w.altFt = alt;
+        fp.waypoints.push_back(std::move(w));
+    }
+    return fp;
+}
+
 static float FlightLoop(float, float, int, void*) {
     if (!g_server) return 1.0f;
     AircraftState s;
@@ -112,13 +152,21 @@ static float FlightLoop(float, float, int, void*) {
     s.wind_dir        = getf(dr_wdir);
     s.wind_spd_kts    = getf(dr_wspd) * MS_TO_KT;
     g_server->UpdateState(s);
+
+    // The FMS plan changes rarely, so refresh it about once a second
+    // instead of every frame.
+    static int fmsTick = 0;
+    if (++fmsTick >= 10) {
+        fmsTick = 0;
+        g_server->UpdateFlightPlan(ReadFMS());
+    }
     return 0.1f;
 }
 
 PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc) {
     std::strcpy(outName, "DogeTracker");
     std::strcpy(outSig,  "com.dogetracker.plugin");
-    std::strcpy(outDesc, "Live moving map — open your browser or AviTab after loading");
+    std::strcpy(outDesc, "Live moving map, open your browser or AviTab after loading");
 
     dr_lat     = XPLMFindDataRef("sim/flightmodel/position/latitude");
     dr_lon     = XPLMFindDataRef("sim/flightmodel/position/longitude");
