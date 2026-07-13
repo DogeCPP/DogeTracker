@@ -206,7 +206,7 @@
 
       <h3 class="section-label">About</h3>
       <div class="fact-table">
-        <div class="fact"><span>Version</span><span>DogeTracker v1.4.0</span></div>
+        <div class="fact"><span>Version</span><span>DogeTracker v1.5.0</span></div>
         <div class="fact"><span>Connected to</span><span><span id="host-display">127.0.0.1</span>:<span id="port-display">4000</span></span></div>
         <div class="fact"><span>Source</span><span><a href="https://github.com/DogeCPP/DogeTracker" target="_blank" rel="noopener">DogeCPP/DogeTracker</a></span></div>
       </div>
@@ -252,6 +252,16 @@
       <button class="btn btn-sec" id="btn-centre">Centre on aircraft</button>
       <button class="btn btn-ghost" id="btn-clear-trail">Clear trail</button>
     </div>
+
+    <h3 class="section-label">Live traffic</h3>
+    <p class="help-text">Other pilots currently online, pulled straight from the network's public data feed. Click one to see its altitude, speed, and route.</p>
+    <div class="legend-toggles">
+      <label class="row-check"><input type="checkbox" id="opt-vatsim" /><span class="chk"></span>
+        <span class="net-legend net-legend-vatsim"></span><span>VATSIM</span></label>
+      <label class="row-check"><input type="checkbox" id="opt-ivao" /><span class="chk"></span>
+        <span class="net-legend net-legend-ivao"></span><span>IVAO</span></label>
+    </div>
+    <div id="traffic-msg" class="msg-line"></div>
 
     <h3 class="section-label">Navaids</h3>
     <label class="row-check master"><input type="checkbox" id="opt-navaids" /><span class="chk"></span><span>Show navaids on map</span></label>

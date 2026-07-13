@@ -67,21 +67,36 @@ function todNM(alt,angle) { return alt/(Math.tan(rad(angle))*6076.12); }
 
 const $ = id => document.getElementById(id);
 
-function planeIcon(hdg) {
+// Simplified top-down widebody silhouette: straight tapered fuselage, swept
+// wings, a tailplane, and a single fin. Drawn from scratch to keep a clean
+// silhouette at small map sizes rather than a highly detailed trace.
+function jetPath() {
+  return `M32 3
+    C33.6 3 34.6 6.7 34.8 13.5
+    L35 21 60 33.5 60 38 35 30.5
+    35.3 45.5 45 51.5 45 55 35.6 51.8
+    34.6 58.4 32 61 29.4 58.4 28.4 51.8
+    19 55 19 51.5 28.7 45.5
+    29 30.5 4 38 4 33.5 29 21
+    29.2 13.5 C29.4 6.7 30.4 3 32 3 Z`;
+}
+
+function planeIcon(hdg, opts) {
+  opts = opts || {};
   const dk = document.documentElement.dataset.theme === 'dark';
-  const fill = dk ? '#6fc6c1' : '#146b64';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="46" height="46">
+  const fill = opts.fill || (dk ? '#6fc6c1' : '#146b64');
+  const stroke = opts.stroke || (dk ? '#0a1a1a' : '#0a2422');
+  const size = opts.size || 44;
+  const opacity = opts.opacity != null ? opts.opacity : 1;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${size}" height="${size}" opacity="${opacity}">
   <g transform="rotate(${hdg},32,32)">
-    <path fill="${fill}" stroke="#0a1a33" stroke-width="1.1" stroke-linejoin="round" d="
-      M32 4 c2.1 0 3.5 3.5 3.7 8.8 l0.2 9.6 21.1 12.7 0 4.7 -21.2 -6.3 -0.2 11.7
-      6.7 4.8 0 3.4 -7 -2.1 -0.6 4.9 -2.4 2.6 -2.4 -2.6 -0.6 -4.9 -7 2.1 0 -3.4
-      6.7 -4.8 -0.2 -11.7 -21.2 6.3 0 -4.7 21.1 -12.7 0.2 -9.6 C28.5 7.5 29.9 4 32 4 Z"/>
-    <circle cx="32" cy="15" r="1.7" fill="rgba(255,255,255,.55)"/>
+    <path fill="${fill}" stroke="${stroke}" stroke-width="1.4" stroke-linejoin="round" d="${jetPath()}"/>
   </g>
 </svg>`;
+  const half = size/2;
   return L.divIcon({
-    html: `<div style="filter:drop-shadow(0 2px 5px rgba(0,0,0,.55))">${svg}</div>`,
-    className:'', iconSize:[46,46], iconAnchor:[23,23], popupAnchor:[0,-24]
+    html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))">${svg}</div>`,
+    className:'', iconSize:[size,size], iconAnchor:[half,half], popupAnchor:[0,-half+2]
   });
 }
 
@@ -550,6 +565,28 @@ async function loadPlanFile(file) {
   }
 }
 
+// Compact oceanic-style position label for a lat/lon, e.g. "S05 E087",
+// the same convention used for random-routing position reports.
+function gridLabel(lat,lon) {
+  const la=Math.abs(lat).toFixed(0).padStart(2,'0')+(lat<0?'S':'N');
+  const lo=Math.abs(lon).toFixed(0).padStart(3,'0')+(lon<0?'W':'E');
+  return la+' '+lo;
+}
+
+// Small filled triangle pointing along the route's local bearing, used for
+// every waypoint that isn't an endpoint.
+function routeTriangle(col,bearingDeg) {
+  const html=`<svg viewBox="0 0 14 14" width="14" height="14" style="transform:rotate(${bearingDeg}deg)">
+    <path d="M7 1.5 12 11 2 11z" fill="${col}" stroke="rgba(0,0,0,.5)" stroke-width="1"/>
+  </svg>`;
+  return L.divIcon({ html, className:'', iconSize:[14,14], iconAnchor:[7,7] });
+}
+
+// Legs longer than this with no intermediate fix (typical over open ocean)
+// get synthetic position labels every ~150 NM, the same idea VATSIM Radar
+// uses for its enroute grid references.
+const LONG_LEG_NM = 150;
+
 function drawRoute(fixes) {
   if (routeLayer) { map.removeLayer(routeLayer); routeLayer=null; }
   routeLayer = L.layerGroup();
@@ -566,11 +603,17 @@ function drawRoute(fixes) {
   const step=Math.max(1,Math.round(fixes.length/14));
   fixes.forEach((f,i)=>{
     const end=i===0||i===fixes.length-1;
-    L.circleMarker([f.lat,f.lon],{
-      radius:end?5:2.6, color:line, weight:end?2:1,
-      fillColor:end?endFill:line, fillOpacity:1
-    }).bindPopup(`<b>${f.ident}</b><br>${f.lat.toFixed(4)}, ${f.lon.toFixed(4)}`
-      +(f.altFt?`<br>${f.altFt.toLocaleString()} ft`:'')).addTo(routeLayer);
+    const popup=`<b>${f.ident}</b><br>${f.lat.toFixed(4)}, ${f.lon.toFixed(4)}`
+      +(f.altFt?`<br>${f.altFt.toLocaleString()} ft`:'');
+
+    if (end) {
+      L.circleMarker([f.lat,f.lon],{radius:5,color:line,weight:2,fillColor:endFill,fillOpacity:1})
+       .bindPopup(popup).addTo(routeLayer);
+    } else {
+      const b = brg(fixes[i-1].lat,fixes[i-1].lon,f.lat,f.lon);
+      L.marker([f.lat,f.lon],{icon:routeTriangle(line,b),zIndexOffset:400})
+       .bindPopup(popup).addTo(routeLayer);
+    }
 
     if (end||i%step===0) {
       const fl=f.altFt>=1000?`<span class="wp-fl">FL${Math.round(f.altFt/100)}</span>`:'';
@@ -578,6 +621,23 @@ function drawRoute(fixes) {
         icon:L.divIcon({html:`<div class="wp-tag"><span class="wp-id">${f.ident}</span>${fl}</div>`,className:'',iconAnchor:[-5,9]}),
         interactive:false, zIndexOffset:500
       }).addTo(routeLayer);
+    }
+
+    // Synthetic grid labels for long legs with nothing named in between.
+    if (i>0) {
+      const prev=fixes[i-1];
+      const legNM=gcNM(prev.lat,prev.lon,f.lat,f.lon);
+      if (legNM > LONG_LEG_NM) {
+        const b=brg(prev.lat,prev.lon,f.lat,f.lon);
+        const nPts=Math.floor(legNM/LONG_LEG_NM);
+        for (let k=1;k<=nPts;k++) {
+          const [glat,glon]=dest(prev.lat,prev.lon,LONG_LEG_NM*k,b);
+          L.marker([glat,glon],{
+            icon:L.divIcon({html:`<div class="grid-label">${gridLabel(glat,glon)}</div>`,className:'',iconAnchor:[-4,4]}),
+            interactive:false, zIndexOffset:350
+          }).addTo(routeLayer);
+        }
+      }
     }
   });
 
@@ -594,6 +654,35 @@ function clearRoute() {
   setRouteMsg('', '');
 }
 
+// Overpass has several independent mirrors; the main one times out under
+// load (504). Rotate through mirrors and retry once before giving up, so a
+// single busy server doesn't just fail the request outright.
+const OVERPASS_MIRRORS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.osm.ch/api/interpreter',
+];
+async function fetchOverpass(query, timeoutMs) {
+  let lastErr;
+  for (let attempt=0; attempt<2; attempt++) {
+    for (const base of OVERPASS_MIRRORS) {
+      const ctrl=new AbortController();
+      const to=setTimeout(()=>ctrl.abort(),timeoutMs);
+      try {
+        const r=await fetch(base+'?data='+encodeURIComponent(query),{signal:ctrl.signal});
+        clearTimeout(to);
+        if (r.status===504||r.status===429) { lastErr=new Error('Overpass HTTP '+r.status); continue; }
+        if (!r.ok) throw new Error('Overpass HTTP '+r.status);
+        return await r.json();
+      } catch(e) {
+        clearTimeout(to);
+        lastErr = e.name==='AbortError' ? new Error('Overpass timed out') : e;
+      }
+    }
+  }
+  throw new Error((lastErr&&lastErr.message||'Overpass request failed')+'. The servers are busy, try again in a minute.');
+}
+
 async function loadNavaids() {
   if (!showNavaids) return;
   if (navLayer) { map.removeLayer(navLayer); navLayer=null; }
@@ -605,9 +694,7 @@ async function loadNavaids() {
   const q=`[out:json][timeout:20];(node["aeroway"="navaid"](${bbox});node["aeroway"="waypoint"](${bbox}););out body;`;
 
   try {
-    const r=await fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(q));
-    if(!r.ok) throw new Error('Overpass HTTP '+r.status);
-    const d=await r.json();
+    const d=await fetchOverpass(q, 20000);
     navLayer=L.layerGroup();
     let cnt=0;
     d.elements.forEach(el=>{
@@ -643,9 +730,7 @@ async function loadAirways() {
   const q=`[out:json][timeout:25];relation["route"="airway"](${bbox});out geom;`;
 
   try {
-    const r=await fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(q));
-    if(!r.ok) throw new Error('Overpass HTTP '+r.status);
-    const d=await r.json();
+    const d=await fetchOverpass(q, 25000);
     airwayLayer=L.layerGroup();
     let cnt=0;
     d.elements.forEach(rel=>{
@@ -665,6 +750,123 @@ async function loadAirways() {
   } catch(e) {
     msg.className='msg-line err'; msg.textContent=e.message;
   }
+}
+
+// ---- Live VATSIM / IVAO traffic ----------------------------------------
+// Both feeds are public JSON with permissive CORS, so this runs entirely in
+// the browser: no plugin/server changes needed. Raw pilot lists are kept in
+// memory and re-filtered to the current map view on every pan/zoom, so
+// panning never triggers a new network request, only the periodic refresh
+// timer does.
+
+let showVatsim=false, showIvao=false;
+let vatsimPilots=[], ivaoPilots=[];
+let vatsimLayer=null, ivaoLayer=null, trafficTimer=null;
+const TRAFFIC_MIN_ZOOM = 4;   // below this the feed would be thousands of markers
+const TRAFFIC_REFRESH_MS = 15000; // matches VATSIM's own feed update cadence
+
+function trafficIcon(hdg, network) {
+  const col = network==='ivao' ? getComputedStyle(document.documentElement).getPropertyValue('--ivao').trim()
+                                : getComputedStyle(document.documentElement).getPropertyValue('--vatsim').trim();
+  return planeIcon(hdg, { fill:col, stroke:'rgba(0,0,0,.55)', size:22, opacity:.9 });
+}
+
+function trafficPopupHtml(p) {
+  const net = p.network==='ivao' ? 'IVAO' : 'VATSIM';
+  const dep = p.dep || '----', arr = p.arr || '----';
+  return `<div class="traffic-pop">
+    <div class="traffic-pop-head">
+      <span class="traffic-pop-cs">${p.callsign}</span>
+      <span class="traffic-pop-net ${p.network}">${net}</span>
+    </div>
+    <div class="traffic-pop-row"><span>Altitude</span><span>${Math.round(p.alt).toLocaleString()} ft</span></div>
+    <div class="traffic-pop-row"><span>Speed</span><span>${Math.round(p.gs)} kts</span></div>
+    <div class="traffic-pop-route">${dep} &rarr; ${arr}</div>
+  </div>`;
+}
+
+async function fetchVatsimTraffic() {
+  try {
+    const r=await fetch('https://data.vatsim.net/v3/vatsim-data.json',{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    vatsimPilots=(d.pilots||[]).filter(p=>p.latitude!=null&&p.longitude!=null).map(p=>({
+      network:'vatsim', callsign:p.callsign, lat:p.latitude, lon:p.longitude,
+      hdg:p.heading||0, alt:p.altitude||0, gs:p.groundspeed||0,
+      dep:p.flight_plan?.departure||'', arr:p.flight_plan?.arrival||''
+    }));
+  } catch(e) {
+    vatsimPilots=[];
+    setTrafficMsg('err','VATSIM feed unreachable: '+e.message);
+  }
+}
+
+async function fetchIvaoTraffic() {
+  try {
+    const r=await fetch('https://api.ivao.aero/v2/tracker/whazzup',{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    ivaoPilots=(d.clients?.pilots||[]).filter(p=>p.lastTrack).map(p=>({
+      network:'ivao', callsign:p.callsign, lat:p.lastTrack.latitude, lon:p.lastTrack.longitude,
+      hdg:p.lastTrack.heading||0, alt:p.lastTrack.altitude||0, gs:p.lastTrack.groundSpeed||0,
+      dep:p.flightPlan?.departureId||'', arr:p.flightPlan?.arrivalId||''
+    }));
+  } catch(e) {
+    ivaoPilots=[];
+    setTrafficMsg('err','IVAO feed unreachable: '+e.message);
+  }
+}
+
+function setTrafficMsg(cls, txt) {
+  const m=$('traffic-msg'); if(!m) return;
+  m.className='msg-line'+(cls?' '+cls:''); m.textContent=txt;
+}
+
+function renderTraffic() {
+  if (vatsimLayer) { map.removeLayer(vatsimLayer); vatsimLayer=null; }
+  if (ivaoLayer)   { map.removeLayer(ivaoLayer);   ivaoLayer=null;   }
+  if (!showVatsim && !showIvao) { setTrafficMsg('',''); return; }
+  if (map.getZoom() < TRAFFIC_MIN_ZOOM) { setTrafficMsg('','Zoom in to see traffic'); return; }
+
+  const b=map.getBounds();
+  let shown=0;
+
+  if (showVatsim) {
+    vatsimLayer=L.layerGroup();
+    vatsimPilots.filter(p=>b.contains([p.lat,p.lon])).forEach(p=>{
+      L.marker([p.lat,p.lon],{icon:trafficIcon(p.hdg,'vatsim'),zIndexOffset:300})
+       .bindPopup(trafficPopupHtml(p)).addTo(vatsimLayer);
+      shown++;
+    });
+    vatsimLayer.addTo(map);
+  }
+  if (showIvao) {
+    ivaoLayer=L.layerGroup();
+    ivaoPilots.filter(p=>b.contains([p.lat,p.lon])).forEach(p=>{
+      L.marker([p.lat,p.lon],{icon:trafficIcon(p.hdg,'ivao'),zIndexOffset:300})
+       .bindPopup(trafficPopupHtml(p)).addTo(ivaoLayer);
+      shown++;
+    });
+    ivaoLayer.addTo(map);
+  }
+  setTrafficMsg('ok', shown+' aircraft in view');
+}
+
+async function refreshTrafficData() {
+  const jobs=[];
+  if (showVatsim) jobs.push(fetchVatsimTraffic());
+  if (showIvao)   jobs.push(fetchIvaoTraffic());
+  if (jobs.length) { setTrafficMsg('','Loading traffic...'); await Promise.all(jobs); }
+  renderTraffic();
+}
+
+function ensureTrafficTimer() {
+  if (trafficTimer) return;
+  trafficTimer=setInterval(refreshTrafficData, TRAFFIC_REFRESH_MS);
+}
+function stopTrafficTimerIfIdle() {
+  if (showVatsim || showIvao) return;
+  clearInterval(trafficTimer); trafficTimer=null;
 }
 
 function getACtx() {
@@ -802,6 +1004,8 @@ function setTheme(t) {
   if(typeof setBaseTiles==='function') setBaseTiles();
   if(trailLine) trailLine.setStyle({color:t==='dark'?'#6fc6c1':'#146b64'});
   if(cur) drawWind(cur.wind_dir, cur.wind_spd_kts);
+  if(acMark) acMark.setIcon(planeIcon(cur?cur.heading:0));
+  if(typeof renderTraffic==='function' && (showVatsim||showIvao)) renderTraffic();
 }
 
 document.querySelectorAll('.tab').forEach(btn=>{
@@ -866,6 +1070,25 @@ map.on('moveend',()=>{
   if (!showNavaids) return;
   clearTimeout(navReloadTimer);
   navReloadTimer=setTimeout(loadNavaids, 600);
+});
+
+$('opt-vatsim').addEventListener('change',e=>{
+  showVatsim=e.target.checked;
+  if(showVatsim){ ensureTrafficTimer(); refreshTrafficData(); }
+  else { renderTraffic(); stopTrafficTimerIfIdle(); }
+});
+$('opt-ivao').addEventListener('change',e=>{
+  showIvao=e.target.checked;
+  if(showIvao){ ensureTrafficTimer(); refreshTrafficData(); }
+  else { renderTraffic(); stopTrafficTimerIfIdle(); }
+});
+// Panning only re-filters the already-fetched pilot lists to the new view,
+// it never triggers a network request.
+let trafficRedrawTimer=null;
+map.on('moveend',()=>{
+  if (!showVatsim && !showIvao) return;
+  clearTimeout(trafficRedrawTimer);
+  trafficRedrawTimer=setTimeout(renderTraffic, 200);
 });
 
 $('opt-tod-marker').addEventListener('change',e=>{showTodMark=e.target.checked;if(!showTodMark&&todMark){map.removeLayer(todMark);todMark=null;}if(showTodMark&&cur)updateTodMark(cur);});

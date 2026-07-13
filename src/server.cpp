@@ -93,10 +93,24 @@ struct DogeServerImpl {
     }
 
     void setupRoutes() {
+        // No Access-Control-Allow-Origin header here on purpose. The web UI is
+        // served by this same process, so its own fetches are same-origin and
+        // need no CORS header at all. Setting "*" (the old behaviour) meant
+        // any website open in another tab could silently read live position
+        // data from this server in the background, since a wildcard opts
+        // every cross-origin page into reading the response. Leaving CORS
+        // unset makes the browser block those cross-origin reads by default.
         auto hdr = [](httplib::Response& res) {
-            res.set_header("Access-Control-Allow-Origin", "*");
             res.set_header("Cache-Control", "no-store, no-cache");
         };
+
+        // Applies to every response, including static files served from
+        // webDir, not just the routes defined below.
+        svr.set_post_routing_handler([](const httplib::Request&, httplib::Response& res) {
+            res.set_header("X-Content-Type-Options", "nosniff");
+            res.set_header("X-Frame-Options", "SAMEORIGIN");
+            res.set_header("Referrer-Policy", "no-referrer");
+        });
 
         svr.Get("/api/position", [this, hdr](const httplib::Request&, httplib::Response& res) {
             hdr(res);
@@ -105,7 +119,7 @@ struct DogeServerImpl {
 
         svr.Get("/api/health", [hdr](const httplib::Request&, httplib::Response& res) {
             hdr(res);
-            res.set_content("{\"status\":\"ok\",\"plugin\":\"DogeTracker\",\"version\":\"1.4.0\"}", "application/json");
+            res.set_content("{\"status\":\"ok\",\"plugin\":\"DogeTracker\",\"version\":\"1.5.0\"}", "application/json");
         });
 
         // Active FMS flight plan, refreshed on the sim main thread.
