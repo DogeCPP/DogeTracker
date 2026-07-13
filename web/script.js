@@ -105,7 +105,9 @@ function navSymbol(kind, ident) {
   return L.divIcon({ html, className:'', iconSize:[22,34], iconAnchor:[11,11], popupAnchor:[0,-11] });
 }
 
-const map = L.map('map', { center:[51.5,-0.1], zoom:12, zoomControl:true });
+// Zoom control lives bottom-left so the floating flight card doesn't cover it.
+const map = L.map('map', { center:[51.5,-0.1], zoom:12, zoomControl:false });
+L.control.zoom({ position:'bottomleft' }).addTo(map);
 
 // The raw OpenStreetMap tile servers block app/embedded use (they return a
 // "Referer is required" tile), so we use CARTO's basemaps instead: still
@@ -401,6 +403,20 @@ function routeStats(fixes) {
   };
 }
 
+// Waypoint timeline in the Route panel. Clicking an entry pans the map to it.
+function buildWpList(fixes) {
+  const wl=$('wp-list'); if(!wl) return;
+  wl.innerHTML='';
+  fixes.forEach((f,i)=>{
+    const li=document.createElement('li');
+    li.className='wp-item'+(i===0||i===fixes.length-1?' end':'');
+    const sub=f.altFt>=1000?'FL'+Math.round(f.altFt/100):(f.altFt?f.altFt+' ft':'');
+    li.innerHTML=`<span class="wp-dot"></span><span class="wp-ident">${f.ident}</span><span class="wp-sub">${sub}</span>`;
+    li.addEventListener('click',()=>map.setView([f.lat,f.lon],Math.max(map.getZoom(),9)));
+    wl.appendChild(li);
+  });
+}
+
 // Single entry point for every source: draw the line, fill the info panel.
 function showRoute(route) {
   clearRoute();
@@ -417,6 +433,7 @@ function showRoute(route) {
   $('fs-fuel').textContent  = m.fuelKg||'--';
   $('fs-fixes').textContent = fixes.length;
   $('fs-rte').textContent   = m.routeStr||fixes.map(f=>f.ident).join(' ');
+  buildWpList(fixes);
   $('sb-data').hidden=false;
 
   setRouteMsg('ok', fixes.length+' waypoints loaded from '+(route.source||'plan').toLowerCase());
@@ -573,6 +590,7 @@ function clearRoute() {
   sbRoute=null;
   $('sb-data').hidden=true;
   $('rb-src').textContent='';
+  const wl=$('wp-list'); if(wl) wl.innerHTML='';
   setRouteMsg('', '');
 }
 
@@ -904,4 +922,33 @@ $('btn-test-conn').addEventListener('click',async()=>{
   drawADI(0,0); drawWind(0,0);
   setConn(false);
   poll();
+})();
+
+// ---- top bar clock, flight card collapse, map layers drawer ----
+
+(function zuluClock() {
+  const el=$('z-clock'); if(!el) return;
+  const tick=()=>{
+    const d=new Date();
+    el.textContent=String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0')+'Z';
+  };
+  tick(); setInterval(tick,1000);
+})();
+
+(function panelCollapse() {
+  const btn=$('fp-collapse'), fp=document.getElementById('float-panel');
+  if(!btn||!fp) return;
+  btn.addEventListener('click',()=>fp.classList.toggle('collapsed'));
+  // Card title follows the active tab, and switching tabs reopens the card.
+  const titles={flight:'Your aircraft',route:'Flight plan',tod:'Descent',settings:'Setup'};
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+    fp.classList.remove('collapsed');
+    const ti=$('fp-title'); if(ti&&titles[t.dataset.tab]) ti.textContent=titles[t.dataset.tab];
+  }));
+})();
+
+(function layersDrawer() {
+  const tab=$('drawer-tab'), drawer=document.getElementById('map-drawer');
+  if(!tab||!drawer) return;
+  tab.addEventListener('click',()=>drawer.classList.toggle('open'));
 })();

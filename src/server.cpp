@@ -105,7 +105,7 @@ struct DogeServerImpl {
 
         svr.Get("/api/health", [hdr](const httplib::Request&, httplib::Response& res) {
             hdr(res);
-            res.set_content("{\"status\":\"ok\",\"plugin\":\"DogeTracker\",\"version\":\"1.3.1\"}", "application/json");
+            res.set_content("{\"status\":\"ok\",\"plugin\":\"DogeTracker\",\"version\":\"1.4.0\"}", "application/json");
         });
 
         // Active FMS flight plan, refreshed on the sim main thread.
