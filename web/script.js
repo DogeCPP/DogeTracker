@@ -106,13 +106,31 @@ function navSymbol(kind, ident) {
 }
 
 const map = L.map('map', { center:[51.5,-0.1], zoom:12, zoomControl:true });
+
+// The raw OpenStreetMap tile servers block app/embedded use (they return a
+// "Referer is required" tile), so we use CARTO's basemaps instead: still
+// free, OSM based, and they ship a proper dark style so no CSS invert hack.
+const CARTO_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>';
 const tiles = {
-  osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom:19 }),
+  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    { subdomains:'abcd', attribution:CARTO_ATTR, maxZoom:20 }),
+  light: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    { subdomains:'abcd', attribution:CARTO_ATTR, maxZoom:20 }),
   sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     { attribution:'© Esri', maxZoom:19 })
 };
-tiles.osm.addTo(map);
+
+let satOn = false, baseLayer = null;
+function setBaseTiles() {
+  const want = satOn ? tiles.sat
+    : (document.documentElement.dataset.theme === 'dark' ? tiles.dark : tiles.light);
+  if (baseLayer === want) return;
+  if (baseLayer) map.removeLayer(baseLayer);
+  baseLayer = want;
+  baseLayer.addTo(map);
+  if (baseLayer.bringToBack) baseLayer.bringToBack();
+}
+setBaseTiles();
 
 function apply(s) {
   
@@ -763,6 +781,7 @@ function disarm() {
 function setTheme(t) {
   document.documentElement.dataset.theme=t;
   localStorage.setItem('dt-theme',t);
+  if(typeof setBaseTiles==='function') setBaseTiles();
   if(trailLine) trailLine.setStyle({color:t==='dark'?'#6fc6c1':'#146b64'});
   if(cur) drawWind(cur.wind_dir, cur.wind_spd_kts);
 }
@@ -791,7 +810,7 @@ $('theme-btn').addEventListener('click',()=>setTheme(document.documentElement.da
 
 $('opt-follow').addEventListener('change',e=>{followAc=e.target.checked;if(followAc&&cur)map.setView([cur.lat,cur.lon],map.getZoom());});
 $('opt-trail').addEventListener('change',e=>{showTrail=e.target.checked;if(!showTrail&&trailLine){map.removeLayer(trailLine);trailLine=null;trailPts=[];}});
-$('opt-sat').addEventListener('change',e=>{if(e.target.checked){map.removeLayer(tiles.osm);tiles.sat.addTo(map);}else{map.removeLayer(tiles.sat);tiles.osm.addTo(map);}});
+$('opt-sat').addEventListener('change',e=>{satOn=e.target.checked;setBaseTiles();});
 $('opt-smooth').addEventListener('change',e=>smoothMove=e.target.checked);
 
 $('zoom-sl').addEventListener('input',e=>{const z=+e.target.value;$('zoom-val').textContent=z;map.setZoom(z);});

@@ -54,9 +54,13 @@ static std::string GetPluginRoot() {
     char raw[512] = {};
     XPLMGetPluginInfo(XPLMGetMyID(), nullptr, raw, nullptr, nullptr);
     std::string p(raw);
-    auto s1 = p.find_last_of("/\\");
+    // Native paths give us "/" (or "\" on Windows). ":" is kept as a fallback
+    // for legacy HFS paths; on Windows the final separator is always / or \,
+    // so the drive-letter colon is never matched here.
+    const char* seps = "/\\:";
+    auto s1 = p.find_last_of(seps);           // strip DogeTracker.xpl
     if (s1 != std::string::npos) p = p.substr(0, s1);
-    auto s2 = p.find_last_of("/\\");
+    auto s2 = p.find_last_of(seps);           // strip the mac_x64 / win_x64 / lin_x64 folder
     if (s2 != std::string::npos) p = p.substr(0, s2);
     return p;
 }
@@ -167,6 +171,12 @@ PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc) {
     std::strcpy(outName, "DogeTracker");
     std::strcpy(outSig,  "com.dogetracker.plugin");
     std::strcpy(outDesc, "Live moving map, open your browser or AviTab after loading");
+
+    // Without this, X-Plane hands back legacy HFS paths on macOS (colon
+    // separated), so the plugin directory can't be resolved and the web/
+    // folder isn't found. Native paths give normal / separated paths on
+    // every platform.
+    XPLMEnableFeature("XPLM_USE_NATIVE_PATHS", 1);
 
     dr_lat     = XPLMFindDataRef("sim/flightmodel/position/latitude");
     dr_lon     = XPLMFindDataRef("sim/flightmodel/position/longitude");

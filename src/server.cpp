@@ -105,7 +105,7 @@ struct DogeServerImpl {
 
         svr.Get("/api/health", [hdr](const httplib::Request&, httplib::Response& res) {
             hdr(res);
-            res.set_content("{\"status\":\"ok\",\"plugin\":\"DogeTracker\",\"version\":\"1.3.0\"}", "application/json");
+            res.set_content("{\"status\":\"ok\",\"plugin\":\"DogeTracker\",\"version\":\"1.3.1\"}", "application/json");
         });
 
         // Active FMS flight plan, refreshed on the sim main thread.
@@ -133,7 +133,8 @@ struct DogeServerImpl {
                     "<html><body style='font-family:sans-serif;padding:2em'>"
                     "<h2>DogeTracker is running</h2>"
                     "<p>Web directory not found: " + webDir + "</p>"
-                    "<p>Make sure the web/ folder is next to the 64/ folder.</p>"
+                    "<p>Make sure the web/ folder sits next to the mac_x64 / win_x64 / lin_x64 "
+                    "folder inside the DogeTracker plugin directory.</p>"
                     "</body></html>";
                 res.set_content(html, "text/html");
             });
