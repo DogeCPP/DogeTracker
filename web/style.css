@@ -10,57 +10,57 @@
 }
 
 [data-theme="dark"] {
-  --bg:        #0c0c0b;
-  --sb:        #111110;
-  --card:      rgba(17, 17, 16, .93);
-  --panel:     #171716;
-  --panel-2:   #1c1b1a;
-  --elevated:  #201f1e;
-  --border:    #2a2927;
-  --border-2:  #38362f;
-  --text:      #e9e6df;
-  --muted:     #8c887f;
-  --faint:     #5c5952;
-  --accent:    #d98c2b;
-  --data:      #6fc6c1;
-  --val:       #6fc6c1;
-  --ok:        #6cb56a;
-  --bad:       #cc5e4e;
-  --warn:      #d98c2b;
-  --pri:       #d98c2b;
-  --pri-text:  #16130a;
-  --dan:       #8f3a2f;
-  --dan-h:     #a64535;
-  --ring-bg:   #2a2927;
-  --shadow:    0 10px 30px rgba(0, 0, 0, .5);
+  --bg:        #0a0d12;
+  --sb:        #0e131b;
+  --card:      rgba(14, 19, 27, .93);
+  --panel:     #141b26;
+  --panel-2:   #19212e;
+  --elevated:  #1d2634;
+  --border:    #232d3b;
+  --border-2:  #31404f;
+  --text:      #e6ecf3;
+  --muted:     #8b97a8;
+  --faint:     #5a6675;
+  --accent:    #3b9ae8;
+  --data:      #6fc0ee;
+  --val:       #6fc0ee;
+  --ok:        #4bb673;
+  --bad:       #e0614f;
+  --warn:      #e0a13a;
+  --pri:       #2f83d6;
+  --pri-text:  #ffffff;
+  --dan:       #a33b2f;
+  --dan-h:     #bb4638;
+  --ring-bg:   #232d3b;
+  --shadow:    0 10px 30px rgba(0, 0, 0, .55);
   --vatsim:    #5b8def;
   --ivao:      #b06fd9;
 }
 
 [data-theme="light"] {
-  --bg:        #eeece5;
-  --sb:        #f8f7f3;
-  --card:      rgba(248, 247, 243, .94);
-  --panel:     #f1efe8;
-  --panel-2:   #e8e5db;
-  --elevated:  #fcfbf8;
-  --border:    #d8d4c6;
-  --border-2:  #c3beac;
-  --text:      #23211b;
-  --muted:     #6b6656;
-  --faint:     #948f7c;
-  --accent:    #a8621a;
-  --data:      #146b64;
-  --val:       #146b64;
-  --ok:        #3f7a3c;
-  --bad:       #a3392b;
-  --warn:      #a8621a;
-  --pri:       #a8621a;
-  --pri-text:  #fbf7ee;
-  --dan:       #a3392b;
-  --dan-h:     #8c2f23;
-  --ring-bg:   #d8d4c6;
-  --shadow:    0 10px 26px rgba(30, 25, 10, .22);
+  --bg:        #eef2f7;
+  --sb:        #ffffff;
+  --card:      rgba(255, 255, 255, .94);
+  --panel:     #f2f5f9;
+  --panel-2:   #e7edf4;
+  --elevated:  #ffffff;
+  --border:    #d9e0ea;
+  --border-2:  #c3ccd9;
+  --text:      #14202e;
+  --muted:     #58677a;
+  --faint:     #90a0b2;
+  --accent:    #1f6fc4;
+  --data:      #1466b0;
+  --val:       #1466b0;
+  --ok:        #2f8a4e;
+  --bad:       #c23b2c;
+  --warn:      #b0710f;
+  --pri:       #1f6fc4;
+  --pri-text:  #ffffff;
+  --dan:       #c23b2c;
+  --dan-h:     #a83226;
+  --ring-bg:   #d9e0ea;
+  --shadow:    0 10px 26px rgba(20, 40, 80, .16);
   --vatsim:    #2f5fc4;
   --ivao:      #8a3fae;
 }
@@ -509,6 +509,31 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 .alarm-plane svg { width: 46px; height: 46px; fill: none; stroke: var(--bad); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .alarm-card h2 { font-size: 20px; font-weight: 800; color: var(--bad); letter-spacing: .5px; text-transform: uppercase; }
 .alarm-card p { font-size: 13px; color: var(--muted); margin-top: 7px; }
+
+/* ---------- update banner ---------- */
+#update-banner {
+  position: fixed; z-index: 50; top: calc(var(--topbar-h) + 12px); left: 50%;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 11px;
+  padding: 8px 10px 8px 14px;
+  background: var(--card); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--accent); border-radius: var(--r-card); box-shadow: var(--shadow);
+  animation: update-drop .25s ease;
+}
+#update-banner[hidden] { display: none; }
+@keyframes update-drop { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translateX(-50%); } }
+#update-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); flex-shrink: 0; }
+#update-txt { font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; }
+#update-banner .btn { padding: 6px 12px; font-size: 11.5px; }
+#update-close {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 18px; line-height: 1; width: 22px; height: 22px;
+}
+#update-close:hover { color: var(--text); }
+
+/* Ko-fi support button */
+.btn-kofi { background: #29abe0; color: #fff; border-color: #29abe0; }
+.btn-kofi:hover { filter: brightness(1.08); }
 
 /* ---------- responsive ---------- */
 @media (max-width: 640px) {

@@ -206,10 +206,14 @@
 
       <h3 class="section-label">About</h3>
       <div class="fact-table">
-        <div class="fact"><span>Version</span><span>DogeTracker v1.5.0</span></div>
+        <div class="fact"><span>Version</span><span>DogeTracker v1.6.0</span></div>
         <div class="fact"><span>Connected to</span><span><span id="host-display">127.0.0.1</span>:<span id="port-display">4000</span></span></div>
         <div class="fact"><span>Source</span><span><a href="https://github.com/DogeCPP/DogeTracker" target="_blank" rel="noopener">DogeCPP/DogeTracker</a></span></div>
       </div>
+
+      <h3 class="section-label">Support the project</h3>
+      <p class="help-text">DogeTracker is free and open source, built by one person in their spare time. If it made a flight nicer, a coffee genuinely helps keep it going.</p>
+      <a class="btn btn-kofi btn-full" href="https://ko-fi.com/dogeeeee" target="_blank" rel="noopener">Buy me a coffee on Ko-fi</a>
 
       <h3 class="section-label">Open on other devices</h3>
       <div class="lan-box">
@@ -281,15 +285,15 @@
     <button class="btn btn-sec" id="btn-load-airways">Load airways in view</button>
     <div id="awy-msg" class="msg-line"></div>
 
-    <div class="nav-note">
-      <div class="nav-note-head">Navigraph (optional)</div>
-      <p>Full aviation chart integration needs a Navigraph subscription. Paste your API key below and the endpoints are already wired up. The free OSM data covers most flights fine on its own.</p>
-      <input class="text-input" type="password" id="ng-key" placeholder="Navigraph API key" />
-      <button class="btn btn-ghost" id="btn-ng-save">Save key</button>
-    </div>
-
   </div>
 </aside>
+
+<div id="update-banner" hidden>
+  <span id="update-dot"></span>
+  <span id="update-txt">A new version is available</span>
+  <a id="update-btn" class="btn btn-pri" href="https://github.com/DogeCPP/DogeTracker/releases" target="_blank" rel="noopener">Get update</a>
+  <button id="update-close" aria-label="Dismiss">&times;</button>
+</div>
 
 <div id="alarm-overlay" hidden>
   <div class="alarm-card">

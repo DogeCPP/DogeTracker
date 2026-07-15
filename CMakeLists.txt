@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(DogeTracker VERSION 1.5.0 LANGUAGES CXX)
+project(DogeTracker VERSION 1.6.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -163,6 +163,6 @@ add_custom_command(TARGET DogeTracker POST_BUILD
         "${CMAKE_SOURCE_DIR}/config.json" "${PACKAGE_DIR}/config.json"
 )
 
-message(STATUS "DogeTracker v1.5.0")
+message(STATUS "DogeTracker v1.6.0")
 message(STATUS "  SDK    : ${XPLANE_SDK_PATH}")
 message(STATUS "  Output : ${PACKAGE_DIR}/${PLATFORM_NAME}_x64/DogeTracker.xpl")

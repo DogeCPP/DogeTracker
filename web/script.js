@@ -1,10 +1,14 @@
 'use strict';
 
+// Ships in lockstep with the plugin, so this is what the user is running.
+const APP_VERSION = '1.6.0';
+const RELEASES_URL = 'https://github.com/DogeCPP/DogeTracker/releases';
+
 let PORT     = parseInt(localStorage.getItem('dt-port') || '4000', 10);
 const HOST   = window.location.hostname || '127.0.0.1';
 const POLL   = 1000;
 const FPS    = 60;
-const RING_C = 326.7; 
+const RING_C = 326.7;
 
 let cur = null, fromState = null, toState = null;
 let frame = 0, raf = null;
@@ -17,7 +21,6 @@ let followAc = true, showTrail = true, smoothMove = true;
 let showTodMark = true, todAngle = 3;
 let showVOR = true, showNDB = true, showFix = true;
 let showNavaids = false, showAirways = false;
-let ngKey = localStorage.getItem('dt-ngkey') || '';
 
 let armed = false, fired = false;
 let deadline = null, leadMs = 5 * 60000;
@@ -84,7 +87,7 @@ function jetPath() {
 function planeIcon(hdg, opts) {
   opts = opts || {};
   const dk = document.documentElement.dataset.theme === 'dark';
-  const fill = opts.fill || (dk ? '#6fc6c1' : '#146b64');
+  const fill = opts.fill || (dk ? '#3b9ae8' : '#1f6fc4');
   const stroke = opts.stroke || (dk ? '#0a1a1a' : '#0a2422');
   const size = opts.size || 44;
   const opacity = opts.opacity != null ? opts.opacity : 1;
@@ -163,7 +166,7 @@ function apply(s) {
   if (showTrail) {
     trailPts.push([s.lat,s.lon]);
     if (trailPts.length > trailMax) trailPts.shift();
-    const col = document.documentElement.dataset.theme==='dark'?'#6fc6c1':'#146b64';
+    const col = document.documentElement.dataset.theme==='dark'?'#3b9ae8':'#1f6fc4';
     if (!trailLine) trailLine = L.polyline(trailPts,{color:col,weight:2,opacity:.55}).addTo(map);
     else { trailLine.setLatLngs(trailPts); trailLine.setStyle({color:col}); }
   }
@@ -265,7 +268,7 @@ function drawWind(wDir, wSpd) {
   const W=72,H=72,cx=36,cy=36,Rr=28;
   wCtx.clearRect(0,0,W,H);
   const dk = document.documentElement.dataset.theme==='dark';
-  const fg=dk?'#8c887f':'#6b6656', ac=dk?'#6fc6c1':'#146b64';
+  const fg=dk?'#8c887f':'#6b6656', ac=dk?'#3b9ae8':'#1f6fc4';
   wCtx.beginPath(); wCtx.arc(cx,cy,Rr,0,Math.PI*2);
   wCtx.strokeStyle=fg; wCtx.lineWidth=1; wCtx.stroke();
   wCtx.fillStyle=fg; wCtx.font='bold 7px sans-serif';
@@ -298,7 +301,7 @@ function drawProfile(s) {
   const dk = document.documentElement.dataset.theme==='dark';
   const bg = dk?'#1a2030':'#f8f9fb';
   const fg = dk?'#6b7a96':'#6b7a96';
-  const ac = dk?'#6fc6c1':'#146b64';
+  const ac = dk?'#3b9ae8':'#1f6fc4';
   const tod_col = '#e09b3d';
 
   vpCtx.clearRect(0,0,W,H);
@@ -331,7 +334,7 @@ function drawProfile(s) {
   vpCtx.fillText('NM', PAD.l+cw/2, H-2);
 
   
-  vpCtx.strokeStyle=dk?'rgba(111,198,193,.25)':'rgba(20,107,100,.2)';
+  vpCtx.strokeStyle=dk?'rgba(59,154,232,.28)':'rgba(31,111,196,.22)';
   vpCtx.lineWidth=1.5; vpCtx.setLineDash([4,3]);
   vpCtx.beginPath(); vpCtx.moveTo(tx(0),ty(alt)); vpCtx.lineTo(tx(todNm),ty(0)); vpCtx.stroke();
   vpCtx.setLineDash([]);
@@ -343,7 +346,7 @@ function drawProfile(s) {
   vpCtx.lineTo(tx(todNm), ty(0));
   vpCtx.closePath();
   const grad = vpCtx.createLinearGradient(0, PAD.t, 0, PAD.t+ch);
-  grad.addColorStop(0, dk?'rgba(111,198,193,.16)':'rgba(20,107,100,.1)');
+  grad.addColorStop(0, dk?'rgba(59,154,232,.18)':'rgba(31,111,196,.12)');
   grad.addColorStop(1, 'rgba(0,0,0,0)');
   vpCtx.fillStyle=grad; vpCtx.fill();
 
@@ -1002,7 +1005,7 @@ function setTheme(t) {
   document.documentElement.dataset.theme=t;
   localStorage.setItem('dt-theme',t);
   if(typeof setBaseTiles==='function') setBaseTiles();
-  if(trailLine) trailLine.setStyle({color:t==='dark'?'#6fc6c1':'#146b64'});
+  if(trailLine) trailLine.setStyle({color:t==='dark'?'#3b9ae8':'#1f6fc4'});
   if(cur) drawWind(cur.wind_dir, cur.wind_spd_kts);
   if(acMark) acMark.setIcon(planeIcon(cur?cur.heading:0));
   if(typeof renderTraffic==='function' && (showVatsim||showIvao)) renderTraffic();
@@ -1063,7 +1066,6 @@ $('opt-fixes').addEventListener('change',e=>{showFix=e.target.checked;if(showNav
 $('btn-load-navaids').addEventListener('click',loadNavaids);
 $('btn-load-airways').addEventListener('click',()=>{showAirways=true;$('opt-airways').checked=true;loadAirways();});
 $('opt-airways').addEventListener('change',e=>{showAirways=e.target.checked;if(!showAirways&&airwayLayer){map.removeLayer(airwayLayer);airwayLayer=null;}});
-$('btn-ng-save').addEventListener('click',()=>{ngKey=$('ng-key').value.trim();localStorage.setItem('dt-ngkey',ngKey);$('ng-key').value=ngKey?'*'.repeat(8):'';const m=$('nav-msg');m.className='msg-line '+(ngKey?'ok':'');m.textContent=ngKey?'Navigraph key saved.':'Key cleared.';});
 
 let navReloadTimer=null;
 map.on('moveend',()=>{
@@ -1124,7 +1126,6 @@ $('btn-test-conn').addEventListener('click',async()=>{
 
   const sid=localStorage.getItem('dt-sbid'); if(sid) $('sb-id').value=sid;
   const prt=localStorage.getItem('dt-port'); if(prt) { $('port-input').value=prt; $('port-display').textContent=prt; }
-  if(ngKey) $('ng-key').value='*'.repeat(8);
 
   
   (function updateLanUrl() {
@@ -1145,7 +1146,36 @@ $('btn-test-conn').addEventListener('click',async()=>{
   drawADI(0,0); drawWind(0,0);
   setConn(false);
   poll();
+  checkForUpdate();
 })();
+
+// ---- update check against the latest GitHub release ----
+
+// Returns 1 if a > b, -1 if a < b, 0 if equal. Plain numeric semver, enough
+// for this project's x.y.z tags.
+function cmpSemver(a, b) {
+  const pa=a.split('.').map(Number), pb=b.split('.').map(Number);
+  for (let i=0;i<3;i++){ const x=pa[i]||0, y=pb[i]||0; if(x>y) return 1; if(x<y) return -1; }
+  return 0;
+}
+
+async function checkForUpdate() {
+  try {
+    const r=await fetch('https://api.github.com/repos/DogeCPP/DogeTracker/releases/latest',{cache:'no-store'});
+    if(!r.ok) return;
+    const d=await r.json();
+    const latest=(d.tag_name||'').replace(/^v/,'').trim();
+    if(!/^\d+\.\d+\.\d+$/.test(latest)) return;
+    // Only prompt when the release is actually newer than what's running, and
+    // the user hasn't already dismissed this exact version.
+    if(cmpSemver(latest, APP_VERSION) <= 0) return;
+    if(localStorage.getItem('dt-skip-ver')===latest) return;
+    $('update-txt').textContent='DogeTracker '+latest+' is out. You have '+APP_VERSION+'.';
+    $('update-btn').href=d.html_url||RELEASES_URL;
+    $('update-banner').hidden=false;
+    $('update-close').onclick=()=>{ localStorage.setItem('dt-skip-ver',latest); $('update-banner').hidden=true; };
+  } catch(_){ /* offline or rate-limited: silently skip */ }
+}
 
 // ---- top bar clock, flight card collapse, map layers drawer ----
 
