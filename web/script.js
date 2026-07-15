@@ -1,7 +1,7 @@
 'use strict';
 
 // Ships in lockstep with the plugin, so this is what the user is running.
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 const RELEASES_URL = 'https://github.com/DogeCPP/DogeTracker/releases';
 
 let PORT     = parseInt(localStorage.getItem('dt-port') || '4000', 10);
@@ -396,6 +396,7 @@ async function poll() {
     const d = await r.json();
     setConn(true);
     $('last-upd').textContent = new Date().toLocaleTimeString();
+    logbookTick(d, Date.now());   // fed the raw 1 Hz sample, not interpolated frames
     if (!cur) { cur=d; apply(d); map.setView([d.lat,d.lon],map.getZoom()); }
     else if (smoothMove) startLerp(cur, d);
     else { cur=d; apply(d); }
@@ -443,6 +444,8 @@ function showRoute(route) {
   drawRoute(fixes);
 
   const m=route.meta||{};
+  // remembered so the logbook can tag the active flight with dep/arr/aircraft
+  routeInfo = { dep:route.originIcao||null, arr:route.destIcao||null, aircraft:(m.aircraft&&m.aircraft!=='--')?m.aircraft:null };
   $('rb-od').textContent    = (route.originIcao||'----')+' to '+(route.destIcao||'----');
   $('rb-src').textContent   = route.source||'';
   $('fs-ac').textContent    = m.aircraft||'--';
@@ -1120,6 +1123,185 @@ $('btn-test-conn').addEventListener('click',async()=>{
   }
 });
 
+// ---- Flight logbook, landing-rate detection, and replay ----------------
+// A flight is detected from the raw position stream: it starts on takeoff,
+// captures the vertical speed at touchdown as the landing rate, and finalises
+// once the aircraft is stopped on the ground again. Everything is stored in
+// localStorage, no server involved.
+
+let logbook = [];
+try { logbook = JSON.parse(localStorage.getItem('dt-logbook')||'[]'); } catch(_) { logbook = []; }
+let flt = null;                 // active flight accumulator
+let routeInfo = null;           // {dep,arr,aircraft} from the loaded plan, if any
+
+const LB = { takeoffAgl:60, takeoffGs:45, touchdownAgl:12, stopGs:6, stopHoldMs:8000, minFlightMin:1 };
+
+function saveLogbook() {
+  try { localStorage.setItem('dt-logbook', JSON.stringify(logbook)); } catch(_) {}
+}
+
+function logbookTick(s, tNow) {
+  const onGround = s.agl_ft < LB.touchdownAgl;
+  const moving   = s.groundspeed_kts > LB.stopGs;
+
+  if (!flt) {
+    if (s.agl_ft > LB.takeoffAgl || s.groundspeed_kts > LB.takeoffGs) {
+      flt = {
+        start:tNow, dep:(routeInfo&&routeInfo.dep)||null, arr:null,
+        aircraft:(routeInfo&&routeInfo.aircraft)||null,
+        maxAlt:s.altitude_ft, dist:0, lastLat:s.lat, lastLon:s.lon,
+        everAirborne:s.agl_ft>LB.takeoffAgl, landingVS:null,
+        prevAgl:s.agl_ft, trail:[[s.lat,s.lon]], stoppedSince:null,
+      };
+      renderLogStatus();
+    }
+    return;
+  }
+
+  flt.maxAlt = Math.max(flt.maxAlt, s.altitude_ft);
+  const step = gcNM(flt.lastLat, flt.lastLon, s.lat, s.lon);
+  if (step < 5) flt.dist += step;          // ignore teleports / sim resets
+  flt.lastLat = s.lat; flt.lastLon = s.lon;
+  const last = flt.trail[flt.trail.length-1];
+  if (gcNM(last[0],last[1],s.lat,s.lon) > 0.5) flt.trail.push([s.lat,s.lon]);
+  if (s.agl_ft > LB.takeoffAgl) flt.everAirborne = true;
+
+  // touchdown: crossed down through the near-ground band while descending
+  if (flt.everAirborne && flt.landingVS==null &&
+      flt.prevAgl >= LB.touchdownAgl && s.agl_ft < LB.touchdownAgl && s.vspeed_fpm < 0) {
+    flt.landingVS = Math.round(s.vspeed_fpm);
+    if (routeInfo && routeInfo.arr) flt.arr = routeInfo.arr;
+  }
+  flt.prevAgl = s.agl_ft;
+
+  if (flt.everAirborne && onGround && !moving) {
+    if (!flt.stoppedSince) flt.stoppedSince = tNow;
+    else if (tNow - flt.stoppedSince > LB.stopHoldMs) finalizeFlight(tNow);
+  } else {
+    flt.stoppedSince = null;
+  }
+}
+
+function finalizeFlight(tNow) {
+  const durMin = Math.round((tNow - flt.start)/60000);
+  if (durMin < LB.minFlightMin) { flt=null; renderLogStatus(); return; }
+  let trail = flt.trail;
+  if (trail.length > 600) {                // keep replay data small in storage
+    const stepN = Math.ceil(trail.length/600);
+    trail = trail.filter((_,i)=>i%stepN===0);
+  }
+  logbook.unshift({
+    id:'f'+Date.now(),
+    date:new Date(flt.start).toISOString(),
+    dep:flt.dep||'----',
+    arr:flt.arr||(routeInfo&&routeInfo.arr)||'----',
+    aircraft:flt.aircraft||'--',
+    durationMin:durMin, maxAltFt:Math.round(flt.maxAlt),
+    distanceNM:Math.round(flt.dist), landingVS:flt.landingVS, trail,
+  });
+  if (logbook.length > 200) logbook.length = 200;
+  saveLogbook();
+  flt = null;
+  renderLogbook(); renderLogStatus();
+}
+
+function rateClass(vs) {
+  if (vs==null) return 'normal';
+  const a=Math.abs(vs);
+  if (a<=150) return 'butter';
+  if (a<=400) return 'normal';
+  if (a<=600) return 'firm';
+  return 'hard';
+}
+
+function fmtDur(min) { const h=Math.floor(min/60), m=min%60; return h?h+'h '+m+'m':m+'m'; }
+
+function renderLogStatus() {
+  const el=$('log-status'), t=$('log-status-txt'); if(!el) return;
+  if (flt) { el.className='log-status recording'; t.textContent='Recording flight'+(flt.dep&&flt.dep!=='----'?' from '+flt.dep:''); }
+  else { el.className='log-status idle'; t.textContent='No flight in progress'; }
+}
+
+function renderLogbook() {
+  const list=$('log-list'); if(!list) return;
+  $('log-count').textContent = logbook.length;
+  $('log-empty').hidden = logbook.length>0;
+  list.innerHTML='';
+  logbook.forEach(r=>{
+    const row=document.createElement('div');
+    row.className='log-row';
+    const d=new Date(r.date);
+    const dateStr=d.toLocaleDateString([], {month:'short',day:'numeric'})+' '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    const rate = r.landingVS!=null
+      ? `<span class="log-rate ${rateClass(r.landingVS)}">${r.landingVS} fpm</span>`
+      : '<span class="log-rate normal">--</span>';
+    row.innerHTML=
+      `<div class="log-row-top"><span class="log-od">${r.dep} → ${r.arr}</span><span class="log-date">${dateStr}</span></div>`+
+      `<div class="log-row-mid"><span>${r.aircraft}</span><span>${fmtDur(r.durationMin)}</span>`+
+      `<span class="k">${r.distanceNM} NM</span><span>FL${Math.round(r.maxAltFt/100)}</span>`+
+      `<span>Landing ${rate}</span></div>`+
+      `<div class="log-row-actions"><button class="btn btn-ghost btn-xs" data-act="replay">Replay</button>`+
+      `<button class="btn btn-ghost btn-xs" data-act="del">Delete</button></div>`;
+    row.querySelector('[data-act="replay"]').addEventListener('click',ev=>{ev.stopPropagation();replayFlight(r);});
+    row.querySelector('[data-act="del"]').addEventListener('click',ev=>{ev.stopPropagation();deleteFlight(r.id);});
+    list.appendChild(row);
+  });
+}
+
+function deleteFlight(id) {
+  logbook = logbook.filter(r=>r.id!==id);
+  saveLogbook(); renderLogbook();
+}
+
+let replayLayer=null, replayTimer=null;
+function stopReplay() {
+  if (replayTimer) { clearInterval(replayTimer); replayTimer=null; }
+  if (replayLayer) { map.removeLayer(replayLayer); replayLayer=null; }
+}
+function replayFlight(rec) {
+  stopReplay();
+  const pts=rec.trail;
+  if (!pts || pts.length<2) return;
+  replayLayer=L.layerGroup().addTo(map);
+  L.polyline(pts,{color:'#3b9ae8',weight:2,opacity:.45}).addTo(replayLayer);
+  map.fitBounds(L.latLngBounds(pts),{padding:[55,55]});
+  const mk=L.marker(pts[0],{icon:planeIcon(0),zIndexOffset:1200}).addTo(replayLayer);
+  let i=0;
+  replayTimer=setInterval(()=>{
+    i++;
+    if (i>=pts.length) { clearInterval(replayTimer); replayTimer=null; return; }
+    const hdg=brg(pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1]);
+    mk.setLatLng(pts[i]); mk.setIcon(planeIcon(hdg));
+  }, 55);
+}
+
+function csvCell(v) {
+  const s=String(v==null?'':v);
+  return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function exportLogbookCsv() {
+  if (!logbook.length) return;
+  const head=['date','dep','arr','aircraft','duration_min','max_alt_ft','distance_nm','landing_vs_fpm'];
+  const rows=logbook.map(r=>[r.date,r.dep,r.arr,r.aircraft,r.durationMin,r.maxAltFt,r.distanceNM,r.landingVS==null?'':r.landingVS]);
+  const csv=[head.join(','),...rows.map(r=>r.map(csvCell).join(','))].join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='dogetracker-logbook.csv'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+(function wireLogbook(){
+  const csv=$('btn-log-csv'), clr=$('btn-log-clear');
+  if (csv) csv.addEventListener('click',exportLogbookCsv);
+  if (clr) clr.addEventListener('click',()=>{
+    if (!logbook.length) return;
+    if (confirm('Delete all '+logbook.length+' logged flights? This cannot be undone.')) {
+      logbook=[]; saveLogbook(); renderLogbook();
+    }
+  });
+  renderLogbook(); renderLogStatus();
+})();
+
 (function init() {
   const theme=localStorage.getItem('dt-theme')||'dark';
   setTheme(theme);
@@ -1193,10 +1375,11 @@ async function checkForUpdate() {
   if(!btn||!fp) return;
   btn.addEventListener('click',()=>fp.classList.toggle('collapsed'));
   // Card title follows the active tab, and switching tabs reopens the card.
-  const titles={flight:'Your aircraft',route:'Flight plan',tod:'Descent',settings:'Setup'};
+  const titles={flight:'Your aircraft',route:'Flight plan',tod:'Descent',logs:'Logbook',settings:'Setup'};
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
     fp.classList.remove('collapsed');
     const ti=$('fp-title'); if(ti&&titles[t.dataset.tab]) ti.textContent=titles[t.dataset.tab];
+    if(t.dataset.tab!=='logs' && typeof stopReplay==='function') stopReplay();
   }));
 })();
 

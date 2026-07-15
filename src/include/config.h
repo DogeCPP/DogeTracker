@@ -20,7 +20,7 @@
 
 #define PRODUCT_NAME        "dogetracker"
 #define FRIENDLY_NAME       "DogeTracker"
-#define VERSION             "1.6.0"
+#define VERSION             "1.7.0"
 #define VERSION_CHECK_URL   "https://api.github.com/repos/DogeCPP/DogeTracker/releases?per_page=1&page=1"
 
 #define ALL_PLUGINS_DIRECTORY  "/Resources/plugins/"

@@ -23,6 +23,7 @@
     <button class="tab active" data-tab="flight">Flight</button>
     <button class="tab" data-tab="route">Route</button>
     <button class="tab" data-tab="tod">Descent</button>
+    <button class="tab" data-tab="logs">Logbook</button>
     <button class="tab" data-tab="settings">Setup</button>
   </nav>
 
@@ -194,6 +195,24 @@
       <button class="btn btn-dan btn-full" id="btn-disarm" hidden>Cancel alarm</button>
     </section>
 
+    <section class="panel" id="panel-logs" role="tabpanel">
+      <div id="log-status" class="log-status idle">
+        <span class="log-status-dot"></span>
+        <span id="log-status-txt">No flight in progress</span>
+      </div>
+
+      <div class="log-head">
+        <h3 class="section-label" style="margin:0">Saved flights <span id="log-count" class="log-count">0</span></h3>
+        <div class="log-actions">
+          <button class="btn btn-ghost btn-xs" id="btn-log-csv">CSV</button>
+          <button class="btn btn-ghost btn-xs" id="btn-log-clear">Clear</button>
+        </div>
+      </div>
+
+      <div id="log-list"></div>
+      <p id="log-empty" class="help-text">Flights are logged automatically once you take off and land. Nothing here yet.</p>
+    </section>
+
     <section class="panel" id="panel-settings" role="tabpanel">
       <h3 class="section-label">Connection</h3>
       <p class="help-text">Match this to the <code>port</code> value in <code>config.json</code> on your X-Plane PC.</p>
@@ -206,7 +225,7 @@
 
       <h3 class="section-label">About</h3>
       <div class="fact-table">
-        <div class="fact"><span>Version</span><span>DogeTracker v1.6.0</span></div>
+        <div class="fact"><span>Version</span><span>DogeTracker v1.7.0</span></div>
         <div class="fact"><span>Connected to</span><span><span id="host-display">127.0.0.1</span>:<span id="port-display">4000</span></span></div>
         <div class="fact"><span>Source</span><span><a href="https://github.com/DogeCPP/DogeTracker" target="_blank" rel="noopener">DogeCPP/DogeTracker</a></span></div>
       </div>
