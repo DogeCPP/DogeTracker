@@ -37,8 +37,8 @@ If you wish to support me updating This, Please kindly donate me at ['https://ko
 The route draws as a cased line with a label at every waypoint showing its flight level, plus a waypoint timeline you can click to jump around the plan. Long ocean legs get synthetic position labels, the way real random routing is reported.
 
 **Live traffic and ATC**
-- Other pilots online right now from **VATSIM** and **IVAO**, each network toggled on its own. Click any aircraft for its callsign, altitude, current speed, and departure and arrival
-- Live **VATSIM controllers** with their airspace boundaries highlighted, VAT-Spy style
+- Other pilots and online controllers from **VATSIM** and **IVAO**, one toggle per network turns on both together. Click any aircraft for its callsign, altitude, current speed, and departure and arrival
+- Controllers show up with their airspace boundaries highlighted, VAT-Spy style, and their frequency
 
 **Weather**
 - **METAR** for the airports on your loaded flight plan, pinned on the map and colour coded by flight category (VFR, MVFR, IFR, LIFR). Click a pin for wind, temperature, altimeter, and the raw report
@@ -82,7 +82,17 @@ Edit `config.json` next to the platform folder before starting X-Plane:
 }
 ```
 
-`port` is the TCP port the server listens on. `theme` is the default the frontend uses until you toggle it. You can also change the port later from the Setup tab in the browser, it is saved in your browser.
+`port` is the TCP port the server listens on. `theme` is the default the frontend uses until you toggle it. You can also change the port later from Tools &rarr; Setup in the browser, it is saved in your browser.
+
+## The interface
+
+The top bar has three tabs:
+
+- **Flight**: your live instruments, position, attitude, wind
+- **Route**: load a flight plan from SimBrief, the sim's FMS, or a file, and see it drawn on the map
+- **Tools**: the Descent calculator, your Logbook, and Setup live here as sub-tabs
+
+Map layers (base map, traffic, ATC, weather, navaids) are in the drawer on the right edge of the screen. The search box in the top bar finds airports, navaids, and fixes on your route, with online and nearest-airport lookup as a fallback.
 
 ## Security
 
