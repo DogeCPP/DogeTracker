@@ -18,8 +18,6 @@ Windows · macOS · Linux · free and open source
 
 Under the hood it is a small C++ X-Plane plugin that reads your sim's flight data and serves a tiny local web app. The frontend is plain HTML, CSS, and JavaScript. Nothing to install beyond dropping a folder into your plugins directory, no account, no cloud.
 
-If you wish to support me updating This, Please kindly donate me at ['https://ko-fi.com/dogeeeee'] :D. Grazie!
-
 ![DogeTracker screenshot](web/dogepilot.png)
 
 ## What it does
