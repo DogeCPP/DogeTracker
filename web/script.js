@@ -1,7 +1,7 @@
 'use strict';
 
 // Ships in lockstep with the plugin, so this is what the user is running.
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '2.0.0';
 const RELEASES_URL = 'https://github.com/DogeCPP/DogeTracker/releases';
 
 let PORT     = parseInt(localStorage.getItem('dt-port') || '4000', 10);
@@ -9,6 +9,16 @@ const HOST   = window.location.hostname || '127.0.0.1';
 const POLL   = 1000;
 const FPS    = 60;
 const RING_C = 326.7;
+
+// Units. Everything is stored/computed in aviation units (ft, kt, fpm, NM)
+// and only converted at display time through these formatters.
+let units = localStorage.getItem('dt-units') || 'imperial';
+const U = {
+  alt:  ft  => units==='metric' ? Math.round(ft*0.3048).toLocaleString()+' m'  : Math.round(ft).toLocaleString()+' ft',
+  spd:  kt  => units==='metric' ? Math.round(kt*1.852)+' km/h'                 : Math.round(kt)+' kts',
+  vs:   fpm => units==='metric' ? (fpm>=0?'+':'')+(fpm*0.00508).toFixed(1)+' m/s' : (fpm>=0?'+':'')+Math.round(fpm).toLocaleString()+' fpm',
+  dist: nm  => units==='metric' ? Math.round(nm*1.852).toLocaleString()+' km'  : Math.round(nm).toLocaleString()+' NM',
+};
 
 let cur = null, fromState = null, toState = null;
 let frame = 0, raf = null;
@@ -130,20 +140,27 @@ L.control.zoom({ position:'bottomleft' }).addTo(map);
 // The raw OpenStreetMap tile servers block app/embedded use (they return a
 // "Referer is required" tile), so we use CARTO's basemaps instead: still
 // free, OSM based, and they ship a proper dark style so no CSS invert hack.
-const CARTO_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>';
+const OSM_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const CARTO_ATTR = OSM_ATTR + ' © <a href="https://carto.com/attributions">CARTO</a>';
 const tiles = {
   dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
     { subdomains:'abcd', attribution:CARTO_ATTR, maxZoom:20 }),
   light: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
     { subdomains:'abcd', attribution:CARTO_ATTR, maxZoom:20 }),
+  osm: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution:OSM_ATTR, maxZoom:19 }),
+  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    { subdomains:'abc', attribution:OSM_ATTR + ' © <a href="https://opentopomap.org">OpenTopoMap</a>', maxZoom:17 }),
   sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     { attribution:'© Esri', maxZoom:19 })
 };
 
-let satOn = false, baseLayer = null;
+// The base map is chosen explicitly in the drawer now; theme only styles the
+// UI chrome. Default follows the saved theme so first run still looks right.
+let basePref = localStorage.getItem('dt-basemap') || (document.documentElement.dataset.theme==='dark' ? 'dark' : 'light');
+let baseLayer = null;
 function setBaseTiles() {
-  const want = satOn ? tiles.sat
-    : (document.documentElement.dataset.theme === 'dark' ? tiles.dark : tiles.light);
+  const want = tiles[basePref] || tiles.dark;
   if (baseLayer === want) return;
   if (baseLayer) map.removeLayer(baseLayer);
   baseLayer = want;
@@ -180,17 +197,17 @@ function apply(s) {
   $('v-lat').textContent = s.lat.toFixed(5)+'°';
   $('v-lon').textContent = s.lon.toFixed(5)+'°';
   $('v-hdg').textContent = Math.round(s.heading)+'°';
-  $('v-alt').textContent = Math.round(s.altitude_ft).toLocaleString()+' ft';
-  $('v-agl').textContent = Math.round(s.agl_ft).toLocaleString()+' ft';
-  $('v-ias').textContent = Math.round(s.airspeed_kts)+' kts';
-  $('v-gs').textContent  = Math.round(s.groundspeed_kts)+' kts';
+  $('v-alt').textContent = U.alt(s.altitude_ft);
+  $('v-agl').textContent = U.alt(s.agl_ft);
+  $('v-ias').textContent = U.spd(s.airspeed_kts);
+  $('v-gs').textContent  = U.spd(s.groundspeed_kts);
 
   const vs = Math.round(s.vspeed_fpm);
-  $('v-vs').textContent  = (vs>=0?'+':'')+vs.toLocaleString()+' fpm';
+  $('v-vs').textContent  = U.vs(vs);
   $('v-vs').className = 'ro-val '+(vs>100?'climb':vs<-100?'descend':'level');
 
   $('v-wdir').textContent = Math.round(s.wind_dir)+'°';
-  $('v-wspd').textContent = Math.round(s.wind_spd_kts)+' kts';
+  $('v-wspd').textContent = U.spd(s.wind_spd_kts);
 
   drawADI(s.pitch, s.roll);
   drawWind(s.wind_dir, s.wind_spd_kts);
@@ -208,7 +225,7 @@ function updateTodMark(s) {
     icon:L.divIcon({html:`<div class="tod-pill">T/D ${nm.toFixed(1)} NM</div>`,className:'',iconAnchor:[0,10]}),
     zIndexOffset:900
   }).addTo(map);
-  $('tod-dist').textContent = nm.toFixed(1)+' NM';
+  $('tod-dist').textContent = U.dist(nm);
   $('tod-brg').textContent  = Math.round(b)+'°';
 }
 
@@ -450,7 +467,7 @@ function showRoute(route) {
   $('rb-src').textContent   = route.source||'';
   $('fs-ac').textContent    = m.aircraft||'--';
   $('fs-fl').textContent    = m.cruiseFL||'--';
-  $('fs-dist').textContent  = (m.distanceNM!=null?m.distanceNM:'--')+' NM';
+  $('fs-dist').textContent  = (m.distanceNM!=null?U.dist(m.distanceNM):'--');
   $('fs-fuel').textContent  = m.fuelKg||'--';
   $('fs-fixes').textContent = fixes.length;
   $('fs-rte').textContent   = m.routeStr||fixes.map(f=>f.ident).join(' ');
@@ -458,6 +475,7 @@ function showRoute(route) {
   $('sb-data').hidden=false;
 
   setRouteMsg('ok', fixes.length+' waypoints loaded from '+(route.source||'plan').toLowerCase());
+  if (typeof showWx!=='undefined' && showWx) loadWeather();   // refresh METAR for the new route
 }
 
 // FMS and file plans share the same computed-summary path.
@@ -653,11 +671,12 @@ function drawRoute(fixes) {
 
 function clearRoute() {
   if (routeLayer) { map.removeLayer(routeLayer); routeLayer=null; }
-  sbRoute=null;
+  sbRoute=null; routeInfo=null;
   $('sb-data').hidden=true;
   $('rb-src').textContent='';
   const wl=$('wp-list'); if(wl) wl.innerHTML='';
   setRouteMsg('', '');
+  if (typeof showWx!=='undefined' && showWx && wxLayer) { map.removeLayer(wxLayer); wxLayer=null; setWxMsg('','Load a flight plan to see weather along it.'); }
 }
 
 // Overpass has several independent mirrors; the main one times out under
@@ -785,8 +804,8 @@ function trafficPopupHtml(p) {
       <span class="traffic-pop-cs">${p.callsign}</span>
       <span class="traffic-pop-net ${p.network}">${net}</span>
     </div>
-    <div class="traffic-pop-row"><span>Altitude</span><span>${Math.round(p.alt).toLocaleString()} ft</span></div>
-    <div class="traffic-pop-row"><span>Speed</span><span>${Math.round(p.gs)} kts</span></div>
+    <div class="traffic-pop-row"><span>Altitude</span><span>${U.alt(p.alt)}</span></div>
+    <div class="traffic-pop-row"><span>Speed</span><span>${U.spd(p.gs)}</span></div>
     <div class="traffic-pop-route">${dep} &rarr; ${arr}</div>
   </div>`;
 }
@@ -1038,7 +1057,10 @@ $('theme-btn').addEventListener('click',()=>setTheme(document.documentElement.da
 
 $('opt-follow').addEventListener('change',e=>{followAc=e.target.checked;if(followAc&&cur)map.setView([cur.lat,cur.lon],map.getZoom());});
 $('opt-trail').addEventListener('change',e=>{showTrail=e.target.checked;if(!showTrail&&trailLine){map.removeLayer(trailLine);trailLine=null;trailPts=[];}});
-$('opt-sat').addEventListener('change',e=>{satOn=e.target.checked;setBaseTiles();});
+document.querySelectorAll('input[name="basemap"]').forEach(r=>{
+  if (r.value===basePref) r.checked=true;
+  r.addEventListener('change',e=>{ basePref=e.target.value; localStorage.setItem('dt-basemap',basePref); setBaseTiles(); });
+});
 $('opt-smooth').addEventListener('change',e=>smoothMove=e.target.checked);
 
 $('zoom-sl').addEventListener('input',e=>{const z=+e.target.value;$('zoom-val').textContent=z;map.setZoom(z);});
@@ -1233,12 +1255,12 @@ function renderLogbook() {
     const d=new Date(r.date);
     const dateStr=d.toLocaleDateString([], {month:'short',day:'numeric'})+' '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
     const rate = r.landingVS!=null
-      ? `<span class="log-rate ${rateClass(r.landingVS)}">${r.landingVS} fpm</span>`
+      ? `<span class="log-rate ${rateClass(r.landingVS)}">${U.vs(r.landingVS)}</span>`
       : '<span class="log-rate normal">--</span>';
     row.innerHTML=
       `<div class="log-row-top"><span class="log-od">${r.dep} → ${r.arr}</span><span class="log-date">${dateStr}</span></div>`+
       `<div class="log-row-mid"><span>${r.aircraft}</span><span>${fmtDur(r.durationMin)}</span>`+
-      `<span class="k">${r.distanceNM} NM</span><span>FL${Math.round(r.maxAltFt/100)}</span>`+
+      `<span class="k">${U.dist(r.distanceNM)}</span><span>FL${Math.round(r.maxAltFt/100)}</span>`+
       `<span>Landing ${rate}</span></div>`+
       `<div class="log-row-actions"><button class="btn btn-ghost btn-xs" data-act="replay">Replay</button>`+
       `<button class="btn btn-ghost btn-xs" data-act="del">Delete</button></div>`;
@@ -1301,6 +1323,286 @@ function exportLogbookCsv() {
   });
   renderLogbook(); renderLogStatus();
 })();
+
+// ---- Units toggle -------------------------------------------------------
+
+(function wireUnits(){
+  document.querySelectorAll('input[name="units"]').forEach(r=>{
+    if (r.value===units) r.checked=true;
+    r.addEventListener('change',e=>{
+      units=e.target.value; localStorage.setItem('dt-units',units);
+      if (cur) apply(cur);           // re-render live readouts
+      renderLogbook();               // and stored distances / landing rates
+      if (showWx) loadWeather();     // repopulate METAR popups in the new unit
+    });
+  });
+})();
+
+// ---- Weather (METAR) ----------------------------------------------------
+// Source is metar.vatsim.net (CORS enabled, raw METAR text). Airports come
+// from the loaded flight plan, so weather follows the route you loaded.
+
+let showWx=false, wxLayer=null;
+const WX_COL = { VFR:'#3fbf5f', MVFR:'#3b9ae8', IFR:'#e0614f', LIFR:'#b06fd9' };
+
+function setWxMsg(cls,txt){ const m=$('wx-msg'); if(m){ m.className='msg-line'+(cls?' '+cls:''); m.textContent=txt; } }
+
+function wxAirports(){
+  if (!sbRoute || !sbRoute.waypoints) return [];
+  const seen=new Set(), out=[];
+  sbRoute.waypoints.forEach(f=>{
+    if (/^[A-Z]{4}$/.test(f.ident) && !seen.has(f.ident)) { seen.add(f.ident); out.push(f); }
+  });
+  return out;
+}
+
+function metarCategory(raw){
+  let visSM=10;
+  const cav=/\bCAVOK\b/.test(raw);
+  if (!cav) {
+    let m=raw.match(/\bM?(\d{1,2})SM\b/) || raw.match(/\bM?(\d\/\d)SM\b/);
+    if (m) { visSM = m[1].includes('/') ? (+m[1].split('/')[0]/+m[1].split('/')[1]) : parseInt(m[1]); }
+    else if (/\b9999\b/.test(raw)) visSM=10;
+    else { const mm=raw.match(/\s(\d{4})\s/); if (mm) visSM=parseInt(mm[1])/1609; }
+  }
+  let ceil=99999;
+  const re=/(BKN|OVC|VV)(\d{3})/g; let mm;
+  while ((mm=re.exec(raw))) { const ft=parseInt(mm[2])*100; if (ft<ceil) ceil=ft; }
+  if (cav) ceil=99999;
+  let cat='VFR';
+  if (visSM<1 || ceil<500) cat='LIFR';
+  else if (visSM<3 || ceil<1000) cat='IFR';
+  else if (visSM<=5 || ceil<=3000) cat='MVFR';
+  return cat;
+}
+
+function metarPopup(id,raw,cat,col){
+  const wind=raw.match(/\b(\d{3}|VRB)(\d{2})(G(\d{2}))?KT\b/);
+  const temp=raw.match(/\b(M?\d{2})\/(M?\d{2})\b/);
+  const a=raw.match(/\bA(\d{4})\b/), q=raw.match(/\bQ(\d{4})\b/);
+  const rows=[];
+  const windStr = wind ? ((wind[1]==='VRB'?'VRB':wind[1]+'°')+' at '+U.spd(+wind[2])+(wind[4]?' gust '+U.spd(+wind[4]):'')) : 'calm';
+  rows.push(`<div class="traffic-pop-row"><span>Wind</span><span>${windStr}</span></div>`);
+  if (temp) { const tC=parseInt(temp[1].replace('M','-')); rows.push(`<div class="traffic-pop-row"><span>Temp</span><span>${units==='metric'?tC+' °C':Math.round(tC*9/5+32)+' °F'}</span></div>`); }
+  if (a) rows.push(`<div class="traffic-pop-row"><span>Altimeter</span><span>${(parseInt(a[1])/100).toFixed(2)} inHg</span></div>`);
+  else if (q) rows.push(`<div class="traffic-pop-row"><span>QNH</span><span>${q[1]} hPa</span></div>`);
+  return `<div class="traffic-pop"><div class="traffic-pop-head"><span class="traffic-pop-cs">${id}</span>`+
+         `<span class="metar-pop-cat" style="color:${col}">${cat}</span></div>${rows.join('')}`+
+         `<div class="metar-pop-raw">${raw}</div></div>`;
+}
+
+async function loadWeather(){
+  if (wxLayer) { map.removeLayer(wxLayer); wxLayer=null; }
+  if (!showWx) { setWxMsg('',''); return; }
+  const aps=wxAirports();
+  if (!aps.length) { setWxMsg('','Load a flight plan to see weather along it.'); return; }
+  setWxMsg('','Fetching METAR...');
+  try {
+    const r=await fetch('https://metar.vatsim.net/'+aps.map(a=>a.ident).join(','),{cache:'no-store'});
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    const txt=await r.text();
+    const byId={};
+    txt.split(/\r?\n/).forEach(line=>{ const t=line.trim(); if(t){ byId[t.split(/\s+/)[0]]=t; } });
+    wxLayer=L.layerGroup(); let cnt=0;
+    aps.forEach(a=>{
+      const raw=byId[a.ident]; if(!raw) return;
+      const cat=metarCategory(raw), col=WX_COL[cat]||WX_COL.VFR;
+      L.marker([a.lat,a.lon],{
+        icon:L.divIcon({html:`<div class="metar-pin" style="background:${col}">${a.ident} ${cat}</div>`,className:'',iconAnchor:[-6,8]}),
+        zIndexOffset:250
+      }).bindPopup(metarPopup(a.ident,raw,cat,col)).addTo(wxLayer);
+      cnt++;
+    });
+    wxLayer.addTo(map);
+    setWxMsg('ok', cnt+' station'+(cnt!==1?'s':'')+' reporting');
+  } catch(e) { setWxMsg('err','METAR unavailable: '+e.message); }
+}
+
+$('opt-wx').addEventListener('change',e=>{ showWx=e.target.checked; loadWeather(); });
+
+// ---- Live ATC / airspace overlay (VAT-Spy style) ------------------------
+// Controllers come from the VATSIM feed; their airspace polygons and the
+// callsign->boundary mapping come from the community VATSpy data project.
+// The two static files are fetched once and cached.
+
+let showAtc=false, atcLayer=null, atcTimer=null, firMap=null, boundaryById=null;
+
+function setAtcMsg(cls,txt){ const m=$('atc-msg'); if(m){ m.className='msg-line'+(cls?' '+cls:''); m.textContent=txt; } }
+
+async function loadVatspyStatics(){
+  if (firMap && boundaryById) return;
+  const [datTxt, geo]=await Promise.all([
+    fetch('https://raw.githubusercontent.com/vatsimnetwork/vatspy-data-project/master/VATSpy.dat').then(r=>r.text()),
+    fetch('https://raw.githubusercontent.com/vatsimnetwork/vatspy-data-project/master/Boundaries.geojson').then(r=>r.json()),
+  ]);
+  firMap={};
+  let inFir=false;
+  datTxt.split(/\r?\n/).forEach(line=>{
+    if (line.startsWith('[')) { inFir = line.trim()==='[FIRs]'; return; }
+    if (!inFir || line.startsWith(';') || !line.trim()) return;
+    const p=line.split('|');                     // ICAO|NAME|PREFIX|BOUNDARY
+    if (p.length<4) return;
+    const icao=p[0].trim(), name=p[1].trim(), prefix=p[2].trim(), boundary=p[3].trim()||p[0].trim();
+    const rec={boundary,name,icao};
+    if (prefix) firMap[prefix]=rec;
+    if (!firMap[icao]) firMap[icao]=rec;
+  });
+  boundaryById={};
+  (geo.features||[]).forEach(f=>{ boundaryById[f.properties.id]=f; });
+}
+
+function firForCallsign(cs){
+  const parts=cs.split('_');
+  for (let n=parts.length-1; n>=1; n--) {
+    const key=parts.slice(0,n).join('_');
+    if (firMap[key]) return firMap[key];
+  }
+  return firMap[parts[0]]||null;
+}
+
+function drawBoundary(feat, c){
+  const g=feat.geometry;
+  const polys = g.type==='MultiPolygon' ? g.coordinates : [g.coordinates];
+  polys.forEach(poly=>{
+    const rings=poly.map(ring=>ring.map(pt=>[pt[1],pt[0]]));   // [lon,lat] -> [lat,lon]
+    L.polygon(rings,{color:'#3b9ae8',weight:1.2,opacity:.65,fillColor:'#3b9ae8',fillOpacity:.06})
+      .bindPopup(`<b>${c.callsign}</b><br>${feat.properties.id} · ${c.frequency}`).addTo(atcLayer);
+  });
+  const lat=parseFloat(feat.properties.label_lat), lon=parseFloat(feat.properties.label_lon);
+  if (Number.isFinite(lat) && Number.isFinite(lon)) {
+    L.marker([lat,lon],{
+      icon:L.divIcon({html:`<div class="atc-label">${c.callsign} <span class="atc-freq">${c.frequency}</span></div>`,className:''}),
+      interactive:false
+    }).addTo(atcLayer);
+  }
+}
+
+async function loadAtc(){
+  if (atcLayer) { map.removeLayer(atcLayer); atcLayer=null; }
+  if (!showAtc) { setAtcMsg('',''); return; }
+  setAtcMsg('','Loading controllers...');
+  try {
+    await loadVatspyStatics();
+    const d=await fetch('https://data.vatsim.net/v3/vatsim-data.json',{cache:'no-store'}).then(r=>r.json());
+    const ctrs=(d.controllers||[]).filter(c=>c.facility===6 || c.facility===1);   // CTR, FSS
+    atcLayer=L.layerGroup();
+    const drawn=new Set(); let cnt=0;
+    ctrs.forEach(c=>{
+      if (drawn.has(c.callsign)) return;
+      const fir=firForCallsign(c.callsign); if(!fir) return;
+      const feat=boundaryById[fir.boundary]; if(!feat) return;
+      drawn.add(c.callsign);
+      drawBoundary(feat, c);
+      cnt++;
+    });
+    atcLayer.addTo(map);
+    setAtcMsg('ok', cnt+' centre controller'+(cnt!==1?'s':'')+' online');
+  } catch(e) { setAtcMsg('err','ATC unavailable: '+e.message); }
+}
+
+$('opt-atc').addEventListener('change',e=>{
+  showAtc=e.target.checked;
+  if (showAtc) { loadAtc(); if(!atcTimer) atcTimer=setInterval(()=>{ if(showAtc) loadAtc(); }, 60000); }
+  else { loadAtc(); clearInterval(atcTimer); atcTimer=null; }
+});
+
+// ---- Fast search (airports, navaids, route fixes, logbook) --------------
+
+const searchBox=$('search-box'), searchResults=$('search-results');
+let searchMarker=null;
+
+function flyTo(lat,lon,label){
+  map.setView([lat,lon], Math.max(map.getZoom(),10), {animate:true});
+  if (searchMarker) map.removeLayer(searchMarker);
+  searchMarker=L.marker([lat,lon]).addTo(map);
+  if (label) searchMarker.bindPopup('<b>'+label+'</b>').openPopup();
+}
+
+function localSearchItems(q){
+  q=q.toUpperCase();
+  const items=[], seen=new Set();
+  if (sbRoute && sbRoute.waypoints) sbRoute.waypoints.forEach(f=>{
+    if (f.ident.toUpperCase().includes(q) && !seen.has('r'+f.ident)) {
+      seen.add('r'+f.ident); items.push({ident:f.ident,kind:'FIX',desc:'On route',lat:f.lat,lon:f.lon});
+    }
+  });
+  logbook.forEach(r=>[r.dep,r.arr].forEach(a=>{
+    if (a && a!=='----' && a.toUpperCase().includes(q) && !seen.has('l'+a)) {
+      seen.add('l'+a); items.push({ident:a,kind:'APT',desc:'Logbook',lat:null,lon:null});
+    }
+  }));
+  return items.slice(0,7);
+}
+
+function renderSearch(q){
+  if (!q.trim()) { searchResults.hidden=true; return; }
+  const local=localSearchItems(q);
+  let html='';
+  local.forEach((it,i)=>{
+    html+=`<div class="sr-item" data-i="${i}"><span class="sr-ident">${it.ident}</span>`+
+          `<span class="sr-kind">${it.kind}</span><span class="sr-desc">${it.desc}</span></div>`;
+  });
+  html+=`<div class="sr-item" data-online="1"><span class="sr-ident">${q.toUpperCase()}</span>`+
+        `<span class="sr-kind">Find</span><span class="sr-desc">Search online</span></div>`;
+  html+=`<div class="sr-item" data-nearest="1"><span class="sr-ident">Nearest</span>`+
+        `<span class="sr-kind">Apt</span><span class="sr-desc">airports in view</span></div>`;
+  searchResults.innerHTML=html; searchResults.hidden=false;
+  searchResults.querySelectorAll('.sr-item').forEach(el=>{
+    el.addEventListener('mousedown',ev=>{           // mousedown so it fires before blur hides the list
+      ev.preventDefault();
+      if (el.dataset.online) onlineLookup(q);
+      else if (el.dataset.nearest) nearestAirports();
+      else { const it=local[+el.dataset.i]; if (it.lat!=null) flyTo(it.lat,it.lon,it.ident); else onlineLookup(it.ident); }
+      searchResults.hidden=true; searchBox.blur();
+    });
+  });
+}
+
+async function onlineLookup(q){
+  const id=q.trim().toUpperCase();
+  setWxMsg('','');
+  const query=`[out:json][timeout:20];(nwr["icao"="${id}"];nwr["aeroway"="aerodrome"]["iata"="${id}"];node["ref"="${id}"]["aeroway"~"navaid|waypoint"];);out center 3;`;
+  try {
+    const d=await fetchOverpass(query,20000);
+    const el=(d.elements||[]).find(e=>e.lat!=null||e.center);
+    if (!el) { flashSearch('Nothing found for '+id); return; }
+    const lat=el.lat!=null?el.lat:el.center.lat, lon=el.lon!=null?el.lon:el.center.lon;
+    flyTo(lat,lon,(el.tags&&(el.tags.name||el.tags.icao))||id);
+  } catch(e) { flashSearch(e.message); }
+}
+
+async function nearestAirports(){
+  const b=map.getBounds();
+  const bbox=`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
+  flashSearch('Finding airports...');
+  const query=`[out:json][timeout:20];node["aeroway"="aerodrome"]["icao"](${bbox});out 25;`;
+  try {
+    const d=await fetchOverpass(query,20000);
+    const aps=(d.elements||[]).filter(e=>e.lat!=null&&e.tags&&e.tags.icao);
+    if (!aps.length) { flashSearch('No airports in view'); return; }
+    if (searchMarker) map.removeLayer(searchMarker);
+    searchMarker=L.layerGroup().addTo(map);
+    aps.forEach(a=>{
+      L.marker([a.lat,a.lon],{icon:L.divIcon({html:`<div class="metar-pin" style="background:var(--accent)">${a.tags.icao}</div>`,className:'',iconAnchor:[-6,8]})})
+        .bindPopup('<b>'+a.tags.icao+'</b><br>'+(a.tags.name||'')).addTo(searchMarker);
+    });
+    flashSearch(aps.length+' airports in view');
+  } catch(e) { flashSearch(e.message); }
+}
+
+function flashSearch(txt){
+  searchResults.innerHTML=`<div class="sr-empty">${txt}</div>`;
+  searchResults.hidden=false;
+  setTimeout(()=>{ if(searchResults.firstChild&&searchResults.firstChild.className==='sr-empty') searchResults.hidden=true; }, 2500);
+}
+
+if (searchBox) {
+  let sTimer=null;
+  searchBox.addEventListener('input',e=>{ clearTimeout(sTimer); sTimer=setTimeout(()=>renderSearch(e.target.value),120); });
+  searchBox.addEventListener('keydown',e=>{ if(e.key==='Enter'){ const q=searchBox.value.trim(); if(q){ onlineLookup(q); searchResults.hidden=true; } } if(e.key==='Escape'){ searchResults.hidden=true; searchBox.blur(); } });
+  searchBox.addEventListener('focus',()=>{ if(searchBox.value.trim()) renderSearch(searchBox.value); });
+  searchBox.addEventListener('blur',()=>{ setTimeout(()=>searchResults.hidden=true, 150); });
+}
 
 (function init() {
   const theme=localStorage.getItem('dt-theme')||'dark';

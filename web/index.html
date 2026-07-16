@@ -27,6 +27,11 @@
     <button class="tab" data-tab="settings">Setup</button>
   </nav>
 
+  <div id="search-wrap">
+    <input id="search-box" type="text" placeholder="Search airport, navaid, fix" autocomplete="off" spellcheck="false" />
+    <div id="search-results" hidden></div>
+  </div>
+
   <div id="top-right">
     <span id="z-clock">--:--Z</span>
     <span class="top-sep"></span>
@@ -223,9 +228,15 @@
       <button class="btn btn-sec" id="btn-test-conn">Test connection</button>
       <div id="conn-msg" class="msg-line"></div>
 
+      <h3 class="section-label">Units</h3>
+      <div class="seg-group">
+        <label class="seg"><input type="radio" name="units" value="imperial" checked /><span>ft / kt</span></label>
+        <label class="seg"><input type="radio" name="units" value="metric" /><span>m / km/h</span></label>
+      </div>
+
       <h3 class="section-label">About</h3>
       <div class="fact-table">
-        <div class="fact"><span>Version</span><span>DogeTracker v1.7.0</span></div>
+        <div class="fact"><span>Version</span><span>DogeTracker v2.0.0</span></div>
         <div class="fact"><span>Connected to</span><span><span id="host-display">127.0.0.1</span>:<span id="port-display">4000</span></span></div>
         <div class="fact"><span>Source</span><span><a href="https://github.com/DogeCPP/DogeTracker" target="_blank" rel="noopener">DogeCPP/DogeTracker</a></span></div>
       </div>
@@ -251,11 +262,19 @@
   <button id="drawer-tab" aria-label="Map layers">Map layers</button>
   <div id="drawer-body">
 
+    <h3 class="section-label">Base map</h3>
+    <div class="seg-group basemap-seg">
+      <label class="seg"><input type="radio" name="basemap" value="dark" checked /><span>Dark</span></label>
+      <label class="seg"><input type="radio" name="basemap" value="light" /><span>Light</span></label>
+      <label class="seg"><input type="radio" name="basemap" value="osm" /><span>OSM</span></label>
+      <label class="seg"><input type="radio" name="basemap" value="topo" /><span>Topo</span></label>
+      <label class="seg"><input type="radio" name="basemap" value="sat" /><span>Sat</span></label>
+    </div>
+
     <h3 class="section-label">Display</h3>
     <div class="toggle-list">
       <label class="row-check"><input type="checkbox" id="opt-follow" checked /><span class="chk"></span><span>Follow aircraft</span></label>
       <label class="row-check"><input type="checkbox" id="opt-trail"  checked /><span class="chk"></span><span>Show trail</span></label>
-      <label class="row-check"><input type="checkbox" id="opt-sat"            /><span class="chk"></span><span>Satellite imagery</span></label>
       <label class="row-check"><input type="checkbox" id="opt-smooth" checked /><span class="chk"></span><span>Smooth movement</span></label>
     </div>
 
@@ -285,6 +304,22 @@
         <span class="net-legend net-legend-ivao"></span><span>IVAO</span></label>
     </div>
     <div id="traffic-msg" class="msg-line"></div>
+
+    <h3 class="section-label">Live ATC</h3>
+    <p class="help-text">Online VATSIM controllers, with their airspace boundaries highlighted like VAT-Spy.</p>
+    <label class="row-check master"><input type="checkbox" id="opt-atc" /><span class="chk"></span><span>Show controllers</span></label>
+    <div id="atc-msg" class="msg-line"></div>
+
+    <h3 class="section-label">Weather</h3>
+    <p class="help-text">METAR for the airports on your loaded flight plan, coloured by flight category.</p>
+    <label class="row-check master"><input type="checkbox" id="opt-wx" /><span class="chk"></span><span>Show METAR</span></label>
+    <div class="wx-legend">
+      <span><i class="wx-dot" style="background:#3fbf5f"></i>VFR</span>
+      <span><i class="wx-dot" style="background:#3b9ae8"></i>MVFR</span>
+      <span><i class="wx-dot" style="background:#e0614f"></i>IFR</span>
+      <span><i class="wx-dot" style="background:#b06fd9"></i>LIFR</span>
+    </div>
+    <div id="wx-msg" class="msg-line"></div>
 
     <h3 class="section-label">Navaids</h3>
     <label class="row-check master"><input type="checkbox" id="opt-navaids" /><span class="chk"></span><span>Show navaids on map</span></label>

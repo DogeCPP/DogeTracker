@@ -36,15 +36,25 @@ If you wish to support me updating This, Please kindly donate me at ['https://ko
 
 The route draws as a cased line with a label at every waypoint showing its flight level, plus a waypoint timeline you can click to jump around the plan. Long ocean legs get synthetic position labels, the way real random routing is reported.
 
-**Live traffic**
-- Other pilots online right now from **VATSIM** and **IVAO**, each network toggled on its own
-- Click any aircraft for its callsign, altitude, current speed, and departure and arrival
+**Live traffic and ATC**
+- Other pilots online right now from **VATSIM** and **IVAO**, each network toggled on its own. Click any aircraft for its callsign, altitude, current speed, and departure and arrival
+- Live **VATSIM controllers** with their airspace boundaries highlighted, VAT-Spy style
+
+**Weather**
+- **METAR** for the airports on your loaded flight plan, pinned on the map and colour coded by flight category (VFR, MVFR, IFR, LIFR). Click a pin for wind, temperature, altimeter, and the raw report
+
+**Logbook**
+- Every flight is logged automatically: departure and arrival, aircraft, duration, distance, max altitude, and your **landing rate** captured at touchdown
+- Colour coded landings (buttery to hard), one click **replay** of any flight on the map, and **CSV export**
 
 **Navigation and descent**
 - Navaid overlay from free OpenStreetMap data: VOR, NDB, and intersections drawn as proper chart symbols, plus airways
+- **Fast search** across airports, navaids, your route, and your logbook, with online lookup and nearest airport search
 - Top of Descent calculator with a vertical profile chart and a countdown alarm that fires a sound and a full screen alert when it is time to come down
 
 **Nice touches**
+- Five base maps: dark, light, standard OSM, topographic, and satellite
+- Switch between imperial and metric units
 - Dark and light themes
 - Reachable from any device on your network, so you can put the map on a tablet next to you
 - Tells you when a new version is out, with a one click link to the download
