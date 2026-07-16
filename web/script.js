@@ -1,7 +1,7 @@
 'use strict';
 
 // Ships in lockstep with the plugin, so this is what the user is running.
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.0.1';
 const RELEASES_URL = 'https://github.com/DogeCPP/DogeTracker/releases';
 
 let PORT     = parseInt(localStorage.getItem('dt-port') || '4000', 10);
@@ -131,6 +131,16 @@ function navSymbol(kind, ident) {
     (ident ? `<span class="nav-id" style="color:${col}">${ident}</span>` : '') +
     `</div>`;
   return L.divIcon({ html, className:'', iconSize:[22,34], iconAnchor:[11,11], popupAnchor:[0,-11] });
+}
+
+// Shared pin for airport labels (weather, nearest-airport search): a small
+// dot marks the true coordinate, the label tag flows to its right. The
+// anchor points at the dot's centre, not the label, so the marker actually
+// sits where the airport is instead of floating a fixed offset away from it.
+function aptPin(text, color){
+  const html = `<div class="apt-pin"><span class="apt-pin-dot" style="background:${color}"></span>`+
+               `<span class="apt-pin-label" style="background:${color}">${text}</span></div>`;
+  return L.divIcon({ html, className:'', iconSize:[7,18], iconAnchor:[3,9], popupAnchor:[10,-9] });
 }
 
 // Zoom control lives bottom-left so the floating flight card doesn't cover it.
@@ -1099,15 +1109,20 @@ map.on('moveend',()=>{
   navReloadTimer=setTimeout(loadNavaids, 600);
 });
 
+// Each network checkbox drives both its live traffic AND its controllers /
+// airspace boundaries together, there is no separate ATC toggle.
+function ensureAtcTimer(){ if(!atcTimer) atcTimer=setInterval(()=>{ if(showVatsim||showIvao) loadAtc(); }, 60000); }
+function stopAtcTimerIfIdle(){ if(showVatsim||showIvao) return; clearInterval(atcTimer); atcTimer=null; }
+
 $('opt-vatsim').addEventListener('change',e=>{
   showVatsim=e.target.checked;
-  if(showVatsim){ ensureTrafficTimer(); refreshTrafficData(); }
-  else { renderTraffic(); stopTrafficTimerIfIdle(); }
+  if(showVatsim){ ensureTrafficTimer(); refreshTrafficData(); ensureAtcTimer(); loadAtc(); }
+  else { renderTraffic(); stopTrafficTimerIfIdle(); loadAtc(); stopAtcTimerIfIdle(); }
 });
 $('opt-ivao').addEventListener('change',e=>{
   showIvao=e.target.checked;
-  if(showIvao){ ensureTrafficTimer(); refreshTrafficData(); }
-  else { renderTraffic(); stopTrafficTimerIfIdle(); }
+  if(showIvao){ ensureTrafficTimer(); refreshTrafficData(); ensureAtcTimer(); loadAtc(); }
+  else { renderTraffic(); stopTrafficTimerIfIdle(); loadAtc(); stopAtcTimerIfIdle(); }
 });
 // Panning only re-filters the already-fetched pilot lists to the new view,
 // it never triggers a network request.
@@ -1408,7 +1423,7 @@ async function loadWeather(){
       const raw=byId[a.ident]; if(!raw) return;
       const cat=metarCategory(raw), col=WX_COL[cat]||WX_COL.VFR;
       L.marker([a.lat,a.lon],{
-        icon:L.divIcon({html:`<div class="metar-pin" style="background:${col}">${a.ident} ${cat}</div>`,className:'',iconAnchor:[-6,8]}),
+        icon:aptPin(a.ident+' '+cat, col),
         zIndexOffset:250
       }).bindPopup(metarPopup(a.ident,raw,cat,col)).addTo(wxLayer);
       cnt++;
@@ -1421,11 +1436,15 @@ async function loadWeather(){
 $('opt-wx').addEventListener('change',e=>{ showWx=e.target.checked; loadWeather(); });
 
 // ---- Live ATC / airspace overlay (VAT-Spy style) ------------------------
-// Controllers come from the VATSIM feed; their airspace polygons and the
-// callsign->boundary mapping come from the community VATSpy data project.
-// The two static files are fetched once and cached.
+// Controllers are driven by the same VATSIM/IVAO checkboxes as traffic, not
+// a separate toggle. Airspace polygons and the callsign->boundary mapping
+// come from the community VATSpy data project (real-world FIR geometry, so
+// it is reused for both networks); the controller list itself comes from
+// each network's own live feed. The two VATSpy files are fetched once and
+// cached.
 
-let showAtc=false, atcLayer=null, atcTimer=null, firMap=null, boundaryById=null;
+let atcLayer=null, atcTimer=null, firMap=null, boundaryById=null;
+const ATC_COL = { vatsim:'#5b8def', ivao:'#b06fd9' };
 
 function setAtcMsg(cls,txt){ const m=$('atc-msg'); if(m){ m.className='msg-line'+(cls?' '+cls:''); m.textContent=txt; } }
 
@@ -1460,51 +1479,58 @@ function firForCallsign(cs){
   return firMap[parts[0]]||null;
 }
 
-function drawBoundary(feat, c){
+function drawBoundary(feat, callsign, freq, network){
+  const col=ATC_COL[network]||ATC_COL.vatsim;
   const g=feat.geometry;
   const polys = g.type==='MultiPolygon' ? g.coordinates : [g.coordinates];
   polys.forEach(poly=>{
     const rings=poly.map(ring=>ring.map(pt=>[pt[1],pt[0]]));   // [lon,lat] -> [lat,lon]
-    L.polygon(rings,{color:'#3b9ae8',weight:1.2,opacity:.65,fillColor:'#3b9ae8',fillOpacity:.06})
-      .bindPopup(`<b>${c.callsign}</b><br>${feat.properties.id} · ${c.frequency}`).addTo(atcLayer);
+    L.polygon(rings,{color:col,weight:1.2,opacity:.65,fillColor:col,fillOpacity:.06})
+      .bindPopup(`<b>${callsign}</b><br>${feat.properties.id} · ${freq}`).addTo(atcLayer);
   });
   const lat=parseFloat(feat.properties.label_lat), lon=parseFloat(feat.properties.label_lon);
   if (Number.isFinite(lat) && Number.isFinite(lon)) {
     L.marker([lat,lon],{
-      icon:L.divIcon({html:`<div class="atc-label">${c.callsign} <span class="atc-freq">${c.frequency}</span></div>`,className:''}),
+      icon:L.divIcon({html:`<div class="atc-label" style="border-color:${col}">${callsign} <span class="atc-freq" style="color:${col}">${freq}</span></div>`,className:''}),
       interactive:false
     }).addTo(atcLayer);
   }
 }
 
+// VATSIM facility 6=CTR, 1=FSS. IVAO atcSession.position "CTR"/"FSS" is the
+// equivalent, everything else (APP/TWR/GND/DEL) has no FIR-scale boundary.
 async function loadAtc(){
   if (atcLayer) { map.removeLayer(atcLayer); atcLayer=null; }
-  if (!showAtc) { setAtcMsg('',''); return; }
+  if (!showVatsim && !showIvao) { setAtcMsg('',''); return; }
   setAtcMsg('','Loading controllers...');
   try {
     await loadVatspyStatics();
-    const d=await fetch('https://data.vatsim.net/v3/vatsim-data.json',{cache:'no-store'}).then(r=>r.json());
-    const ctrs=(d.controllers||[]).filter(c=>c.facility===6 || c.facility===1);   // CTR, FSS
     atcLayer=L.layerGroup();
     const drawn=new Set(); let cnt=0;
-    ctrs.forEach(c=>{
-      if (drawn.has(c.callsign)) return;
-      const fir=firForCallsign(c.callsign); if(!fir) return;
-      const feat=boundaryById[fir.boundary]; if(!feat) return;
-      drawn.add(c.callsign);
-      drawBoundary(feat, c);
-      cnt++;
-    });
+
+    if (showVatsim) {
+      const d=await fetch('https://data.vatsim.net/v3/vatsim-data.json',{cache:'no-store'}).then(r=>r.json());
+      (d.controllers||[]).filter(c=>c.facility===6 || c.facility===1).forEach(c=>{
+        const key='v_'+c.callsign; if (drawn.has(key)) return;
+        const fir=firForCallsign(c.callsign); if(!fir) return;
+        const feat=boundaryById[fir.boundary]; if(!feat) return;
+        drawn.add(key); drawBoundary(feat, c.callsign, c.frequency, 'vatsim'); cnt++;
+      });
+    }
+    if (showIvao) {
+      const d=await fetch('https://api.ivao.aero/v2/tracker/whazzup',{cache:'no-store'}).then(r=>r.json());
+      (d.clients?.atcs||[]).filter(c=>{ const p=c.atcSession?.position; return p==='CTR'||p==='FSS'; }).forEach(c=>{
+        const key='i_'+c.callsign; if (drawn.has(key)) return;
+        const fir=firForCallsign(c.callsign); if(!fir) return;
+        const feat=boundaryById[fir.boundary]; if(!feat) return;
+        drawn.add(key); drawBoundary(feat, c.callsign, c.atcSession.frequency, 'ivao'); cnt++;
+      });
+    }
+
     atcLayer.addTo(map);
-    setAtcMsg('ok', cnt+' centre controller'+(cnt!==1?'s':'')+' online');
+    setAtcMsg('ok', cnt+' controller'+(cnt!==1?'s':'')+' online');
   } catch(e) { setAtcMsg('err','ATC unavailable: '+e.message); }
 }
-
-$('opt-atc').addEventListener('change',e=>{
-  showAtc=e.target.checked;
-  if (showAtc) { loadAtc(); if(!atcTimer) atcTimer=setInterval(()=>{ if(showAtc) loadAtc(); }, 60000); }
-  else { loadAtc(); clearInterval(atcTimer); atcTimer=null; }
-});
 
 // ---- Fast search (airports, navaids, route fixes, logbook) --------------
 
@@ -1583,7 +1609,7 @@ async function nearestAirports(){
     if (searchMarker) map.removeLayer(searchMarker);
     searchMarker=L.layerGroup().addTo(map);
     aps.forEach(a=>{
-      L.marker([a.lat,a.lon],{icon:L.divIcon({html:`<div class="metar-pin" style="background:var(--accent)">${a.tags.icao}</div>`,className:'',iconAnchor:[-6,8]})})
+      L.marker([a.lat,a.lon],{icon:aptPin(a.tags.icao,'var(--accent)')})
         .bindPopup('<b>'+a.tags.icao+'</b><br>'+(a.tags.name||'')).addTo(searchMarker);
     });
     flashSearch(aps.length+' airports in view');
@@ -1672,16 +1698,42 @@ async function checkForUpdate() {
   tick(); setInterval(tick,1000);
 })();
 
+// Tools is a top-level tab that holds its own sub-navigation (Descent /
+// Logbook / Setup). activeToolsSub tracks which one is showing so the
+// floating card title and the logbook replay guard both know.
+let activeToolsSub='tod';
+
 (function panelCollapse() {
   const btn=$('fp-collapse'), fp=document.getElementById('float-panel');
   if(!btn||!fp) return;
   btn.addEventListener('click',()=>fp.classList.toggle('collapsed'));
+
+  const topTitles={flight:'Your aircraft',route:'Flight plan',tools:'Tools'};
+  const subTitles={tod:'Descent',logs:'Logbook',settings:'Setup'};
+
+  function stopReplayUnlessViewingLogs(){
+    const viewingLogs = document.querySelector('.tab.active')?.dataset.tab==='tools' && activeToolsSub==='logs';
+    if (!viewingLogs && typeof stopReplay==='function') stopReplay();
+  }
+
   // Card title follows the active tab, and switching tabs reopens the card.
-  const titles={flight:'Your aircraft',route:'Flight plan',tod:'Descent',logs:'Logbook',settings:'Setup'};
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
     fp.classList.remove('collapsed');
-    const ti=$('fp-title'); if(ti&&titles[t.dataset.tab]) ti.textContent=titles[t.dataset.tab];
-    if(t.dataset.tab!=='logs' && typeof stopReplay==='function') stopReplay();
+    const ti=$('fp-title');
+    if (ti) ti.textContent = t.dataset.tab==='tools' ? (subTitles[activeToolsSub]||'Tools') : (topTitles[t.dataset.tab]||'');
+    stopReplayUnlessViewingLogs();
+  }));
+
+  // Sub-navigation inside the Tools tab.
+  document.querySelectorAll('.subtab').forEach(st=>st.addEventListener('click',()=>{
+    const id=st.dataset.subtab;
+    document.querySelectorAll('.subtab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.subpanel').forEach(p=>p.classList.remove('active'));
+    st.classList.add('active');
+    $('subpanel-'+id).classList.add('active');
+    activeToolsSub=id;
+    const ti=$('fp-title'); if (ti) ti.textContent=subTitles[id]||'Tools';
+    stopReplayUnlessViewingLogs();
   }));
 })();
 

@@ -22,9 +22,7 @@
   <nav id="tab-bar" role="tablist">
     <button class="tab active" data-tab="flight">Flight</button>
     <button class="tab" data-tab="route">Route</button>
-    <button class="tab" data-tab="tod">Descent</button>
-    <button class="tab" data-tab="logs">Logbook</button>
-    <button class="tab" data-tab="settings">Setup</button>
+    <button class="tab" data-tab="tools">Tools</button>
   </nav>
 
   <div id="search-wrap">
@@ -127,7 +125,14 @@
       </div>
     </section>
 
-    <section class="panel" id="panel-tod" role="tabpanel">
+    <section class="panel" id="panel-tools" role="tabpanel">
+      <div class="subtab-bar" role="tablist">
+        <button class="subtab active" data-subtab="tod">Descent</button>
+        <button class="subtab" data-subtab="logs">Logbook</button>
+        <button class="subtab" data-subtab="settings">Setup</button>
+      </div>
+
+    <div class="subpanel active" id="subpanel-tod" role="tabpanel">
       <h3 class="section-label">Descent calculator</h3>
 
       <label class="row-check"><input type="checkbox" id="opt-tod-marker" checked /><span class="chk"></span><span>Show T/D marker on map</span></label>
@@ -198,9 +203,9 @@
         <button class="btn btn-ghost" id="btn-test-snd">Test</button>
       </div>
       <button class="btn btn-dan btn-full" id="btn-disarm" hidden>Cancel alarm</button>
-    </section>
+    </div>
 
-    <section class="panel" id="panel-logs" role="tabpanel">
+    <div class="subpanel" id="subpanel-logs" role="tabpanel">
       <div id="log-status" class="log-status idle">
         <span class="log-status-dot"></span>
         <span id="log-status-txt">No flight in progress</span>
@@ -216,9 +221,9 @@
 
       <div id="log-list"></div>
       <p id="log-empty" class="help-text">Flights are logged automatically once you take off and land. Nothing here yet.</p>
-    </section>
+    </div>
 
-    <section class="panel" id="panel-settings" role="tabpanel">
+    <div class="subpanel" id="subpanel-settings" role="tabpanel">
       <h3 class="section-label">Connection</h3>
       <p class="help-text">Match this to the <code>port</code> value in <code>config.json</code> on your X-Plane PC.</p>
       <div class="port-row">
@@ -236,7 +241,7 @@
 
       <h3 class="section-label">About</h3>
       <div class="fact-table">
-        <div class="fact"><span>Version</span><span>DogeTracker v2.0.0</span></div>
+        <div class="fact"><span>Version</span><span>DogeTracker v2.0.1</span></div>
         <div class="fact"><span>Connected to</span><span><span id="host-display">127.0.0.1</span>:<span id="port-display">4000</span></span></div>
         <div class="fact"><span>Source</span><span><a href="https://github.com/DogeCPP/DogeTracker" target="_blank" rel="noopener">DogeCPP/DogeTracker</a></span></div>
       </div>
@@ -252,6 +257,7 @@
         <p>Find the IP in the X-Plane developer console, on the line starting <code>Network:</code>, or run <code>ipconfig</code> on Windows.</p>
         <p class="warn-text">Windows Firewall can block the first connection. Allow inbound TCP port <span id="fw-port">4000</span> if the page will not load on other devices.</p>
       </div>
+    </div>
     </section>
 
   </div>
@@ -295,8 +301,8 @@
       <button class="btn btn-ghost" id="btn-clear-trail">Clear trail</button>
     </div>
 
-    <h3 class="section-label">Live traffic</h3>
-    <p class="help-text">Other pilots currently online, pulled straight from the network's public data feed. Click one to see its altitude, speed, and route.</p>
+    <h3 class="section-label">Live network</h3>
+    <p class="help-text">Other pilots and online controllers, pulled straight from each network's public data feed. Click an aircraft for its altitude, speed and route; click a controller's airspace for their frequency.</p>
     <div class="legend-toggles">
       <label class="row-check"><input type="checkbox" id="opt-vatsim" /><span class="chk"></span>
         <span class="net-legend net-legend-vatsim"></span><span>VATSIM</span></label>
@@ -304,10 +310,6 @@
         <span class="net-legend net-legend-ivao"></span><span>IVAO</span></label>
     </div>
     <div id="traffic-msg" class="msg-line"></div>
-
-    <h3 class="section-label">Live ATC</h3>
-    <p class="help-text">Online VATSIM controllers, with their airspace boundaries highlighted like VAT-Spy.</p>
-    <label class="row-check master"><input type="checkbox" id="opt-atc" /><span class="chk"></span><span>Show controllers</span></label>
     <div id="atc-msg" class="msg-line"></div>
 
     <h3 class="section-label">Weather</h3>

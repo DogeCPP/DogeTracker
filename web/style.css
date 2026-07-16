@@ -153,6 +153,19 @@ html, body {
 .panel { display: none; flex-direction: column; }
 .panel.active { display: flex; }
 
+/* Tools sub-navigation (Descent / Logbook / Setup) */
+.subtab-bar { display: flex; gap: 4px; margin: -2px 0 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.subtab {
+  background: none; border: none; cursor: pointer; padding: 7px 3px 9px;
+  font-family: var(--font); font-size: 11.5px; font-weight: 600; color: var(--faint);
+  border-bottom: 2px solid transparent; margin-right: 14px;
+}
+.subtab:hover { color: var(--muted); }
+.subtab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.subpanel { display: none; flex-direction: column; }
+.subpanel.active { display: flex; }
+.subpanel > .section-label:first-child { margin-top: 0; }
+
 /* ---------- map layers drawer ---------- */
 #map-drawer {
   position: fixed; z-index: 30;
@@ -598,7 +611,17 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 .wx-legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 2px; font-size: 10.5px; color: var(--muted); }
 .wx-legend span { display: flex; align-items: center; gap: 4px; }
 .wx-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.metar-pin {
+/* Airport pins: a small dot sits exactly on the true coordinate (that is
+   what iconAnchor points at), with the label tag flowing to its right.
+   Older versions anchored the label box itself with no dot, so it floated
+   several pixels off the real position with nothing marking where the
+   airport actually was. */
+.apt-pin { display: flex; align-items: center; pointer-events: auto; }
+.apt-pin-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-right: 4px;
+  border: 1.5px solid rgba(0,0,0,.55); box-shadow: 0 0 0 2px rgba(255,255,255,.18);
+}
+.apt-pin-label {
   font-family: var(--mono); font-size: 10px; font-weight: 700; color: #fff;
   padding: 2px 6px; border-radius: 3px; white-space: nowrap; border: 1px solid rgba(0,0,0,.4);
   box-shadow: 0 1px 3px rgba(0,0,0,.5);
