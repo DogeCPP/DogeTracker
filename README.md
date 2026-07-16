@@ -4,13 +4,13 @@
 
 # DogeTracker
 
-**A live moving map for X-Plane 12, in your browser.**
+**A free flight tracker for X-Plane 12**
 
-Load the plugin, open `http://127.0.0.1:4000`, and watch your aircraft fly across a real map with live instruments, your flight plan, and other traffic around you. Works on the same PC, or from your phone or tablet on the same wifi.
+Open `http://127.0.0.1:4000`, and watch your aircraft fly across a real map with live instruments, your flight plan, and other traffic around you. Works on the same PC, or from your phone or tablet on the same wifi.
 
 Windows · macOS · Linux · free and open source
 
-[Download the latest release](https://github.com/DogeCPP/DogeTracker/releases) · [Support on Ko-fi](https://ko-fi.com/dogeeeee)
+[Download the latest release](https://github.com/DogeCPP/DogeTracker/releases) · [Support me on Ko-fi](https://ko-fi.com/dogeeeee)
 
 </div>
 
@@ -91,15 +91,6 @@ The top bar has three tabs:
 - **Tools**: the Descent calculator, your Logbook, and Setup live here as sub-tabs
 
 Map layers (base map, traffic, ATC, weather, navaids) are in the drawer on the right edge of the screen. The search box in the top bar finds airports, navaids, and fixes on your route, with online and nearest-airport lookup as a fallback.
-
-## Security
-
-DogeTracker's server has no accounts, no login, and no endpoint that changes anything on your machine. It only reads flight data and serves the map. Given that:
-
-- **No wildcard CORS.** Other websites open in your browser cannot read your live position in the background.
-- **Standard hardening headers** are sent on every response.
-- **Plain HTTP on your LAN only.** A self signed HTTPS certificate would throw a security warning on every device until manually trusted, which would break opening the map on your phone, so it was left off. Do not port forward this to the internet. On a network you do not trust, keep the port firewalled to your own machine or subnet.
-- **No CSRF tokens** because there is nothing to protect: every endpoint is a read only GET, with no forms, cookies, or state changing requests.
 
 ## Support
 
